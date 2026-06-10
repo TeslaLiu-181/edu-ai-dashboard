@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云上3班 · AI教学工具集</title>
+<style>
+:root { --bg: #f0f4f8; --card: #ffffff; --primary: #3b82f6; --text: #1e293b; --muted: #64748b; --border: #e2e8f0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif; background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; }
+.header { text-align: center; margin-bottom: 3rem; }
+.header h1 { font-size: 2rem; color: var(--text); letter-spacing: 0.02em; }
+.header p { color: var(--muted); margin-top: 0.5rem; font-size: 0.95rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; max-width: 780px; width: 100%; }
+.card { background: var(--card); border-radius: 16px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 0.8rem; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.card .icon { font-size: 2.5rem; }
+.card h2 { font-size: 1.25rem; color: var(--text); }
+.card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+.card .tag { display: inline-flex; gap: 0.4rem; flex-wrap: wrap; }
+.card .tag span { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 6px; background: #eff6ff; color: #3b82f6; }
+.footer { margin-top: 3rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+.footer a { color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏫 云上3班 · AI 教学工具集</h1>
+  <p>AI 辅助开发的班级管理与学情分析一体化工具</p>
+</div>
+<div class="cards">
+  <a class="card" href="dashboard.html">
+    <div class="icon">📋</div>
+    <h2>云上3班教师看板</h2>
+    <p>覆盖 59 名学生、9 个学习小组的全维度班级管理中枢。座次图、积分中心、赛季公榜、考试备考一体化。</p>
+    <div class="tag"><span>班级管理</span><span>积分系统</span><span>座次图</span></div>
+  </a>
+  <a class="card" href="score-tracker.html">
+    <div class="icon">📊</div>
+    <h2>成绩追踪可视化</h2>
+    <p>拖入 Excel 即自动解析历次考试数据，输出均分趋势、个人排名双轴、六科雷达图及进退步热力图。</p>
+    <div class="tag"><span>数据分析</span><span>Chart.js</span><span>雷达图</span></div>
+  </a>
+</div>
+<div class="footer">
+  <p>本工具集由 AI 智能体辅助开发 | <a href="https://github.com/TeslaLiu-181/edu-ai-dashboard" target="_blank">GitHub</a></p>
+  <p>2026 年教师人工智能应用案例征集 · 创AI 案例</p>
+</div>
+</body>
+</html>

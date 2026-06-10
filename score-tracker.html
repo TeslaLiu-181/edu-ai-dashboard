@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高一3班 · 成绩追踪可视化系统</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ==================== Design System ==================== */
+:root {
+  --primary: #4472C4;
+  --primary-dark: #2E5090;
+  --primary-light: #6B9BD2;
+  --success: #27AE60;
+  --danger: #E74C3C;
+  --warning: #F39C12;
+  --dark: #2C3E50;
+  --muted: #7F8C8D;
+  --bg: #F5F7FA;
+  --card-bg: #FFFFFF;
+  --border: #E8ECF1;
+  --text: #2C3E50;
+  --text-light: #7F8C8D;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ==================== Upload Overlay ==================== */
+.upload-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(44,62,80,0.92);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; flex-direction: column; gap: 16px;
+}
+.upload-overlay.hidden { display: none; }
+.upload-box {
+  width: 480px; height: 220px;
+  border: 3px dashed rgba(255,255,255,0.4);
+  border-radius: 20px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; cursor: pointer; transition: all 0.3s;
+  color: rgba(255,255,255,0.7);
+}
+.upload-box:hover { border-color: var(--primary-light); background: rgba(255,255,255,0.06); color: #fff; }
+.upload-box svg { width: 48px; height: 48px; opacity: 0.6; }
+.upload-box p { font-size: 15px; }
+.upload-box span { font-size: 12px; opacity: 0.5; }
+.upload-demo {
+  color: rgba(255,255,255,0.5); font-size: 13px; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 4px;
+}
+.upload-demo:hover { color: var(--primary-light); }
+
+/* ==================== Top Bar ==================== */
+.topbar {
+  background: var(--card-bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 56px; position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow);
+}
+.topbar h1 {
+  font-size: 18px; font-weight: 700; color: var(--primary-dark);
+  display: flex; align-items: center; gap: 8px;
+}
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  padding: 6px 16px; border-radius: 8px; border: none;
+  font-size: 13px; font-family: inherit; cursor: pointer;
+  transition: all 0.2s; font-weight: 500;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg); }
+.btn-sm { padding: 4px 12px; font-size: 12px; }
+
+/* ==================== Tab Navigation ==================== */
+.tab-nav {
+  display: flex; gap: 0; background: var(--card-bg);
+  border-bottom: 1px solid var(--border); padding: 0 24px;
+  position: sticky; top: 56px; z-index: 99;
+}
+.tab-btn {
+  padding: 12px 20px; border: none; background: none;
+  font-size: 14px; font-family: inherit; color: var(--muted);
+  cursor: pointer; border-bottom: 3px solid transparent;
+  transition: all 0.2s; font-weight: 500; white-space: nowrap;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+
+/* ==================== Content Area ==================== */
+.content { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ==================== Cards ==================== */
+.card {
+  background: var(--card-bg); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-size: 15px; font-weight: 700; color: var(--dark);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.card-grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ==================== Stat Cards ==================== */
+.stat-card {
+  background: var(--card-bg); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px; text-align: center;
+}
+.stat-value {
+  font-size: 32px; font-weight: 800; color: var(--primary-dark);
+  line-height: 1.2;
+}
+.stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.stat-change { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.stat-change.up { color: var(--success); }
+.stat-change.down { color: var(--danger); }
+
+/* ==================== Tables ==================== */
+.data-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.data-table th {
+  background: var(--primary); color: #fff; font-weight: 600;
+  padding: 8px 10px; text-align: center; cursor: pointer;
+  user-select: none; white-space: nowrap;
+}
+.data-table th:hover { background: var(--primary-dark); }
+.data-table td {
+  padding: 6px 10px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tr:nth-child(even) td { background: #FAFBFC; }
+.data-table tr:hover td { background: #EBF0F7; }
+.rank-up { background: #E8F8F5 !important; }
+.rank-down { background: #FDEDEC !important; }
+.text-green { color: var(--success); font-weight: 700; }
+.text-red { color: var(--danger); font-weight: 700; }
+.text-gold { color: var(--warning); font-weight: 700; }
+
+/* ==================== Charts ==================== */
+.chart-container {
+  position: relative; width: 100%; height: 340px;
+}
+.chart-container.tall { height: 420px; }
+.chart-container.compact { height: 280px; }
+
+/* ==================== Filters ==================== */
+.filter-bar {
+  display: flex; gap: 10px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+select, input[type="text"] {
+  padding: 7px 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; font-family: inherit;
+  background: #fff; color: var(--text);
+}
+select:focus, input:focus { outline: none; border-color: var(--primary-light); }
+
+/* ==================== Group Cards ==================== */
+.group-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.group-card {
+  background: var(--card-bg); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px;
+  border-left: 4px solid var(--primary);
+  cursor: pointer; transition: all 0.2s;
+}
+.group-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.group-name { font-size: 15px; font-weight: 700; color: var(--dark); }
+.group-stats { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.group-avg { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-top: 4px; }
+
+/* ==================== Heatmap ==================== */
+.heatmap-cell {
+  width: 28px; height: 28px; display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 10px; border-radius: 4px; margin: 1px;
+  font-weight: 600; color: #fff;
+}
+
+/* ==================== Report Modal ==================== */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: flex;
+  align-items: center; justify-content: center; z-index: 2000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: #fff; border-radius: 16px; padding: 28px;
+  width: 600px; max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal h2 { font-size: 20px; margin-bottom: 16px; color: var(--dark); }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+.checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+.checkbox-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+
+/* ==================== Toggle Switch ==================== */
+.rank-mode-bar {
+  display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+}
+.toggle-switch {
+  position: relative; width: 44px; height: 24px; display: inline-block;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: #ccc; border-radius: 24px; transition: 0.3s;
+}
+.toggle-slider:before {
+  content: ''; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+.toggle-label { font-size: 12px; color: var(--muted); user-select: none; }
+
+.analysis-mode-bar {
+  display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center;
+}
+.mode-pill {
+  padding: 5px 14px; border-radius: 16px; border: 1px solid var(--border);
+  background: #fff; font-size: 12px; cursor: pointer; transition: all 0.2s;
+  font-family: inherit; color: var(--muted);
+}
+.mode-pill:hover { border-color: var(--primary-light); }
+.mode-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.radar-note { font-size: 11px; color: var(--muted); font-style: italic; }
+
+/* ==================== Responsive ==================== */
+@media (max-width: 900px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .group-grid { grid-template-columns: 1fr 1fr; }
+  .tab-btn { padding: 10px 14px; font-size: 12px; }
+}
+
+/* ==================== Rank Badge ==================== */
+.rank-badge {
+  display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+  font-size: 12px; font-weight: 800; color: #fff; text-align: center;
+  line-height: 26px;
+}
+.rank-1 { background: #D4AC0D; }
+.rank-2 { background: #95A5A6; }
+.rank-3 { background: #CD7F32; }
+.rank-other { background: var(--primary); }
+
+/* ==================== Subject Pills (TAB 5) ==================== */
+.subject-pills {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.subject-pill {
+  padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);
+  background: #fff; font-size: 13px; cursor: pointer; transition: all 0.2s;
+  font-family: inherit; color: var(--muted); white-space: nowrap;
+}
+.subject-pill:hover { border-color: var(--primary-light); color: var(--primary); }
+.subject-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+
+/* ==================== Changes Heatmap V2 ==================== */
+.heatmap-wrap { overflow-x: auto; margin: 8px 0; }
+.heatmap-table { border-collapse: collapse; font-size: 11px; }
+.heatmap-table th {
+  background: var(--dark); color: #fff; padding: 6px 8px;
+  text-align: center; font-weight: 600; position: sticky; top: 0; z-index: 2;
+}
+.heatmap-table th:first-child { position: sticky; left: 0; z-index: 3; background: var(--dark); }
+.heatmap-table td {
+  padding: 5px 8px; text-align: center; border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.heatmap-table td:first-child {
+  position: sticky; left: 0; background: var(--card-bg); font-weight: 600;
+  z-index: 1; text-align: left;
+}
+.heatmap-table tr:nth-child(even) td:first-child { background: #FAFBFC; }
+.heatmap-table tr:hover td { filter: brightness(0.95); }
+.hm-up-3 { background: #1B5E20; color: #fff; }
+.hm-up-2 { background: #388E3C; color: #fff; }
+.hm-up-1 { background: #81C784; color: #1B5E20; }
+.hm-flat { background: #F5F5F5; color: #999; }
+.hm-dn-1 { background: #EF9A9A; color: #B71C1C; }
+.hm-dn-2 { background: #E53935; color: #fff; }
+.hm-dn-3 { background: #B71C1C; color: #fff; }
+
+/* ==================== Step trend selector ==================== */
+.step-selector {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.step-selector label { font-size: 12px; color: var(--muted); }
+
+/* ==================== Scrollbar ==================== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+</style>
+</head>
+<body>
+
+<!-- Upload Overlay -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-box" id="uploadBox">
+    <svg viewBox="0 0 48 48" fill="none"><rect x="20" y="4" width="8" height="32" rx="4" fill="currentColor" opacity="0.6"/><rect x="4" y="20" width="40" height="8" rx="4" fill="currentColor"/></svg>
+    <p>拖入成绩长表文件到此处</p>
+    <span>支持 .xlsx 格式（高一3班_历次成绩长表.xlsx）</span>
+  </div>
+  <span class="upload-demo" onclick="loadDemo()">或点击此处加载演示数据</span>
+  <input type="file" id="fileInput" accept=".xlsx" style="display:none">
+</div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>📊 高一3班 · 成绩追踪系统</h1>
+  <div class="topbar-actions">
+    <span style="font-size:12px;color:var(--muted);margin-right:8px" id="dataStatus">未加载数据</span>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('uploadOverlay').classList.remove('hidden')">📂 更换数据</button>
+    <button class="btn btn-primary btn-sm" onclick="openReportModal()">📄 生成报告</button>
+  </div>
+</div>
+
+<!-- Tab Nav -->
+<div class="tab-nav" id="tabNav">
+  <button class="tab-btn active" data-tab="dashboard">📋 总览</button>
+  <button class="tab-btn" data-tab="student">👤 个人轨迹</button>
+  <button class="tab-btn" data-tab="ranking">🏆 排行榜</button>
+  <button class="tab-btn" data-tab="group">👥 小组对比</button>
+  <button class="tab-btn" data-tab="changes">📈 进退步</button>
+</div>
+
+<!-- Content -->
+<div class="content" id="content"></div>
+
+<!-- Report Modal -->
+<div class="modal-overlay hidden" id="reportModal">
+  <div class="modal">
+    <h2>生成可视化报告</h2>
+    <div class="checkbox-group" id="reportCheckboxes"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeReportModal()">取消</button>
+      <button class="btn btn-primary" onclick="generateReport()">生成报告</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+const state = {
+  rawData: [],       // all rows from xlsx
+  loaded: false,
+  students: [],
+  exams: [],
+  groups: [],
+  subjects: ['语文','数学','英语','物理','化学','生物'],
+  charts: {},         // Chart.js instances for destroy/recreate
+};
+
+// ============================================================
+// SHEETJS DATA LOADING
+// ============================================================
+function parseWorkbook(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  return json;
+}
+
+function initDataStore(rows) {
+  state.rawData = rows;
+  state.students = [...new Set(rows.map(r => String(r['姓名'] || r['姓名\t'] || '').trim()))].filter(Boolean);
+  // extract exam names and preserve order from data
+  const examOrder = [];
+  const seen = new Set();
+  for (const r of rows) {
+    const e = String(r['场次'] || '').trim();
+    if (e && !seen.has(e)) { seen.add(e); examOrder.push(e); }
+  }
+  state.exams = examOrder;
+  // groups
+  state.groups = [...new Set(rows.map(r => String(r['组别'] || '').trim()))].filter(Boolean).sort();
+  state.loaded = true;
+  updateDataStatus();
+  renderAll();
+  document.getElementById('uploadOverlay').classList.add('hidden');
+}
+
+function updateDataStatus() {
+  if (!state.loaded) return;
+  const el = document.getElementById('dataStatus');
+  el.textContent = `${state.exams.length}次考试 · ${state.students.length}人 · ${state.groups.length}组 · ${state.rawData.length}条`;
+}
+
+// ============================================================
+// UPLOAD HANDLERS
+// ============================================================
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+
+uploadBox.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// Drag & Drop
+document.addEventListener('dragover', e => { e.preventDefault(); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) handleFile(f);
+});
+
+async function handleFile(file) {
+  const buf = await file.arrayBuffer();
+  const rows = parseWorkbook(buf);
+  initDataStore(rows);
+}
+
+async function loadDemo() {
+  try {
+    const resp = await fetch('高一3班_历次成绩长表.xlsx');
+    const buf = await resp.arrayBuffer();
+    const rows = parseWorkbook(buf);
+    initDataStore(rows);
+  } catch(e) {
+    alert('演示数据加载失败，请拖入 xlsx 文件。\n' + e.message);
+  }
+}
+
+// ============================================================
+// ANALYSIS FUNCTIONS
+// ============================================================
+function getStudentRow(name, exam) {
+  return state.rawData.find(r =>
+    String(r['姓名']||'').trim() === name && String(r['场次']||'').trim() === exam
+  ) || null;
+}
+
+function getStudentTrajectory(name) {
+  return state.exams.map(exam => getStudentRow(name, exam)).filter(Boolean);
+}
+
+function getExamData(examName) {
+  return state.rawData.filter(r => String(r['场次']||'').trim() === examName)
+    .sort((a,b) => ((a['班排']||999) - (b['班排']||999)));
+}
+
+function getLatestExam() {
+  return state.exams[state.exams.length - 1] || '';
+}
+
+function getClassAvg(examName, field) {
+  const rows = state.rawData.filter(r => String(r['场次']||'').trim() === examName);
+  const vals = rows.map(r => parseFloat(r[field])).filter(v => !isNaN(v));
+  return vals.length ? (vals.reduce((a,b) => a+b,0) / vals.length).toFixed(1) : null;
+}
+
+function getGroupAnalysis(examName) {
+  const rows = state.rawData.filter(r => String(r['场次']||'').trim() === examName);
+  const groups = {};
+  for (const r of rows) {
+    const g = String(r['组别']||'').trim();
+    if (!g) continue;
+    if (!groups[g]) groups[g] = { totals: [], ranks: [], count: 0 };
+    groups[g].totals.push(parseFloat(r['总分'])||0);
+    groups[g].ranks.push(parseFloat(r['校排'])||9999);
+    groups[g].count++;
+  }
+  const result = [];
+  for (const [name, data] of Object.entries(groups)) {
+    result.push({
+      name,
+      count: data.count,
+      avgTotal: (data.totals.reduce((a,b)=>a+b,0)/data.totals.length).toFixed(1),
+      avgRank: (data.ranks.reduce((a,b)=>a+b,0)/data.ranks.length).toFixed(0)
+    });
+  }
+  return result.sort((a,b) => parseFloat(a.avgRank) - parseFloat(b.avgRank));
+}
+
+// ============================================================
+// ENHANCED: getNetChanges — return per-subject + total change
+// ============================================================
+function getNetChanges(fromExam, toExam) {
+  const result = [];
+  for (const name of state.students) {
+    const a = getStudentRow(name, fromExam);
+    const b = getStudentRow(name, toExam);
+    if (!a || !b) continue;
+
+    const entry = {
+      name,
+      group: String(b['组别']||'').trim(),
+      // 总分
+      fromRank: parseFloat(a['校排'])||0,
+      toRank: parseFloat(b['校排'])||0,
+      rankChange: (parseFloat(a['校排'])||0) - (parseFloat(b['校排'])||0),
+      fromClassRank: parseFloat(a['班排'])||0,
+      toClassRank: parseFloat(b['班排'])||0,
+      classChange: (parseFloat(a['班排'])||0) - (parseFloat(b['班排'])||0),
+      fromTot: parseFloat(a['总分'])||0,
+      toTot: parseFloat(b['总分'])||0,
+      totChange: (parseFloat(b['总分'])||0) - (parseFloat(a['总分'])||0),
+      subjects: {}
+    };
+
+    for (const sub of state.subjects) {
+      const fromScore = parseFloat(a[sub]);
+      const toScore = parseFloat(b[sub]);
+      const fromSRank = parseFloat(a[sub+'校排']);
+      const toSRank = parseFloat(b[sub+'校排']);
+      const fromCRank = parseFloat(a[sub+'班排']);
+      const toCRank = parseFloat(b[sub+'班排']);
+
+      const fromAvg = parseFloat(getClassAvg(fromExam, sub));
+      const toAvg = parseFloat(getClassAvg(toExam, sub));
+      const fromDev = (!isNaN(fromScore) && !isNaN(fromAvg) && fromAvg > 0)
+        ? parseFloat(((fromScore-fromAvg)/fromAvg*100).toFixed(1)) : null;
+      const toDev = (!isNaN(toScore) && !isNaN(toAvg) && toAvg > 0)
+        ? parseFloat(((toScore-toAvg)/toAvg*100).toFixed(1)) : null;
+
+      entry.subjects[sub] = {
+        fromScore: isNaN(fromScore)?null:fromScore,
+        toScore: isNaN(toScore)?null:toScore,
+        scoreChange: (isNaN(fromScore)||isNaN(toScore)) ? null : parseFloat((toScore-fromScore).toFixed(1)),
+        fromSRank: isNaN(fromSRank)?null:fromSRank,
+        toSRank: isNaN(toSRank)?null:toSRank,
+        sRankChange: (isNaN(fromSRank)||isNaN(toSRank)) ? null : (fromSRank - toSRank),
+        fromCRank: isNaN(fromCRank)?null:fromCRank,
+        toCRank: isNaN(toCRank)?null:toCRank,
+        cRankChange: (isNaN(fromCRank)||isNaN(toCRank)) ? null : (fromCRank - toCRank),
+        fromDeviation: fromDev,
+        toDeviation: toDev,
+        devChange: (fromDev!=null && toDev!=null) ? parseFloat((toDev-fromDev).toFixed(1)) : null
+      };
+    }
+    result.push(entry);
+  }
+  // Default sort: rankChange desc (most progress first)
+  return result.sort((a,b) => b.rankChange - a.rankChange);
+}
+
+// ============================================================
+// getStepChanges — step-by-step changes within an exam range
+// ============================================================
+function getStepChanges(fromExam, toExam, metric) {
+  // Find all exams between from and to (inclusive)
+  const fromIdx = state.exams.indexOf(fromExam);
+  const toIdx = state.exams.indexOf(toExam);
+  if (fromIdx < 0 || toIdx < 0 || fromIdx >= toIdx) return { exams: [], data: [] };
+
+  const range = state.exams.slice(fromIdx, toIdx + 1);
+  const steps = []; // [{stepLabel, from, to, students: {name→change}}]
+  for (let i = 1; i < range.length; i++) {
+    const stepData = { label: range[i-1] + '→' + range[i], students: {} };
+    for (const name of state.students) {
+      const prev = getStudentRow(name, range[i-1]);
+      const curr = getStudentRow(name, range[i]);
+      if (!prev || !curr) continue;
+      let change = 0;
+      if (metric === 'schoolRank') {
+        change = (parseFloat(prev['校排'])||0) - (parseFloat(curr['校排'])||0);
+      } else if (metric === 'classRank') {
+        change = (parseFloat(prev['班排'])||0) - (parseFloat(curr['班排'])||0);
+      } else if (metric === 'deviation') {
+        const pAvg = parseFloat(getClassAvg(range[i-1], '总分'));
+        const cAvg = parseFloat(getClassAvg(range[i], '总分'));
+        const pTot = parseFloat(prev['总分'])||0;
+        const cTot = parseFloat(curr['总分'])||0;
+        if (pAvg && cAvg && pAvg > 0 && cAvg > 0) {
+          const pDev = (pTot - pAvg) / pAvg * 100;
+          const cDev = (cTot - cAvg) / cAvg * 100;
+          change = parseFloat((cDev - pDev).toFixed(1));
+        }
+      }
+      stepData.students[name] = change;
+    }
+    steps.push(stepData);
+  }
+  return { exams: range, steps };
+}
+
+// keep backward compat alias
+function getRankChanges(fromExam, toExam) {
+  return getNetChanges(fromExam, toExam).map(c => ({
+    name: c.name, fromRank: c.fromRank, toRank: c.toRank,
+    change: c.rankChange, fromTot: c.fromTot, toTot: c.toTot
+  }));
+}
+
+// ============================================================
+// 六科优劣势分析 — 雷达图数据
+// ============================================================
+function getSubjectAdvantageData(name, examName, mode) {
+  /*
+    mode: 'deviation'       → 原始离均差（学生得分 - 班级均分）
+          'deviationPercent' → 离均差百分比 (score-avg)/avg*100
+          'rank'             → 折算排名（越高越好，映射到 0-100）
+    返回: { labels, values, maxVal, minVal, meta, mode }
+  */
+  const row = getStudentRow(name, examName);
+  if (!row) return null;
+
+  const labels = [];
+  const values = [];
+  const meta = [];
+
+  for (const sub of state.subjects) {
+    const score = parseFloat(row[sub]);
+    const classAvg = parseFloat(getClassAvg(examName, sub));
+    const schoolRank = parseFloat(row[sub + '校排']);
+    const classRank = parseFloat(row[sub + '班排']);
+
+    if (isNaN(score) || isNaN(classAvg)) continue;
+
+    labels.push(sub);
+
+    if (mode === 'deviationPercent') {
+      // 离均差百分比: (score-avg)/avg*100  <-- 默认模式
+      const devPct = parseFloat(((score - classAvg) / classAvg * 100).toFixed(1));
+      values.push(devPct);
+      meta.push({ score, classAvg, schoolRank, classRank, deviationPercent: devPct });
+    } else {
+      // 折算排名
+      const MAX_RANK = 1334;
+      const normalized = Math.max(0, parseFloat(((1 - (schoolRank || 999) / MAX_RANK) * 100).toFixed(0)));
+      values.push(normalized);
+      meta.push({ score, classAvg, schoolRank, classRank, normalized });
+    }
+  }
+
+  // 动态缩放
+  const maxAbs = Math.max(...values.map(Math.abs), 5);
+  return {
+    labels,
+    values,
+    maxVal: (mode === 'deviationPercent') ? maxAbs + 3 : 100,
+    minVal: (mode === 'deviationPercent') ? -(maxAbs + 3) : 0,
+    meta,
+    mode
+  };
+}
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+function destroyChart(key) {
+  if (state.charts[key]) { state.charts[key].destroy(); delete state.charts[key]; }
+}
+
+function createChart(canvasId, config, chartKey) {
+  destroyChart(chartKey);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  state.charts[chartKey] = new Chart(ctx, config);
+  return state.charts[chartKey];
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+document.getElementById('tabNav').addEventListener('click', e => {
+  if (!e.target.classList.contains('tab-btn')) return;
+  if (!state.loaded) { alert('请先拖入成绩文件'); return; }
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  const tab = e.target.dataset.tab;
+  switchTab(tab);
+});
+
+function switchTab(tab) {
+  const content = document.getElementById('content');
+  switch(tab) {
+    case 'dashboard': content.innerHTML = renderDashboard(); break;
+    case 'student':   content.innerHTML = renderStudentTab(); break;
+    case 'ranking':   content.innerHTML = renderRankingTab(); break;
+    case 'group':     content.innerHTML = renderGroupTab(); break;
+    case 'changes':   content.innerHTML = renderChangesTab(); break;
+  }
+  // Re-initialize charts for the new tab
+  setTimeout(() => {
+    if (tab === 'dashboard') initDashboardCharts();
+    if (tab === 'student') initStudentCharts();
+    if (tab === 'ranking') initRankingCharts();
+    if (tab === 'group') initGroupCharts();
+    if (tab === 'changes') initChangesCharts();
+  }, 50);
+}
+
+function renderAll() {
+  const active = document.querySelector('.tab-btn.active');
+  const tab = active ? active.dataset.tab : 'dashboard';
+  switchTab(tab);
+}
+
+// ============================================================
+// TAB 1: DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const latest = getLatestExam();
+  const avg = getClassAvg(latest, '总分');
+  const prevAvg = state.exams.length > 1 ? getClassAvg(state.exams[state.exams.length-2], '总分') : avg;
+  const avgChange = (parseFloat(avg) - parseFloat(prevAvg)).toFixed(1);
+  const changes = state.exams.length > 1
+    ? getRankChanges(state.exams[state.exams.length-2], latest) : [];
+  const top5 = changes.filter(c => c.change > 0).slice(0, 5);
+  const bottom5 = changes.filter(c => c.change < 0).slice(-5).reverse();
+
+  return `
+    <div class="card-grid grid-4" style="margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-value">${state.exams.length}</div>
+        <div class="stat-label">考试次数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${state.students.length}</div>
+        <div class="stat-label">学生人数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${avg || '—'}</div>
+        <div class="stat-label">最新均分（${latest}）</div>
+        <div class="stat-change ${parseFloat(avgChange)>=0?'up':'down'}">${parseFloat(avgChange)>=0?'↑':'↓'} ${avgChange}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${state.groups.length}</div>
+        <div class="stat-label">学习小组</div>
+      </div>
+    </div>
+
+    <div class="card-grid grid-2">
+      <div class="card">
+        <div class="card-title">📈 班级均分趋势</div>
+        <div class="chart-container"><canvas id="chartAvgTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 最新各科均分（${latest}）</div>
+        <div class="chart-container"><canvas id="chartSubjAvg"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card-grid grid-2">
+      <div class="card">
+        <div class="card-title">🚀 Top5 进步榜（${latest} vs 上次）</div>
+        ${top5.length ? top5.map((s,i) => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span class="rank-badge rank-${i+1}">${i+1}</span>
+          <span style="flex:1;font-weight:600">${s.name}</span>
+          <span style="font-size:12px;color:var(--muted)">校排 ${s.fromRank}→${s.toRank}</span>
+          <span style="color:var(--success);font-weight:700">↑ ${s.change}</span>
+        </div>`).join('') : '<p style="color:var(--muted)">需至少两场考试数据</p>'}
+      </div>
+      <div class="card">
+        <div class="card-title">⚠️ Bottom5 退步预警（${latest} vs 上次）</div>
+        ${bottom5.length ? bottom5.map((s,i) => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--danger);font-weight:700">⚠️</span>
+          <span style="flex:1;font-weight:600">${s.name}</span>
+          <span style="font-size:12px;color:var(--muted)">校排 ${s.fromRank}→${s.toRank}</span>
+          <span style="color:var(--danger);font-weight:700">↓ ${Math.abs(s.change)}</span>
+        </div>`).join('') : '<p style="color:var(--muted)">需至少两场考试数据</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function initDashboardCharts() {
+  // Avg trend
+  const labels = state.exams;
+  const avgData = state.exams.map(e => parseFloat(getClassAvg(e, '总分')) || null);
+  createChart('chartAvgTrend', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '班级均分', data: avgData,
+        borderColor: '#4472C4', backgroundColor: 'rgba(68,114,196,0.1)',
+        fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#4472C4'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } }
+    }
+  }, 'avgTrend');
+
+  // Subject avg (latest)
+  const latest = getLatestExam();
+  const subjAvgs = state.subjects.map(s => parseFloat(getClassAvg(latest, s)) || 0);
+  createChart('chartSubjAvg', {
+    type: 'bar',
+    data: {
+      labels: state.subjects,
+      datasets: [{
+        label: '平均分', data: subjAvgs,
+        backgroundColor: ['#4472C4','#2E86C1','#1ABC9C','#27AE60','#F39C12','#E74C3C']
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: false, min: Math.min(...subjAvgs)-10 } }
+    }
+  }, 'subjAvg');
+}
+
+// ============================================================
+// ============================================================
+// ============================================================
+// TAB 2: STUDENT TRAJECTORY
+// ============================================================
+let studentState = { fullRange: false, subjMode: 'rank', compareMode: false, compareNames: [], radarExams: [], radarAnimating: false, radarAnimInterval: null };
+
+function renderStudentTab() {
+  const options = state.students.map(s => `<option value="${s}">${s}</option>`).join('');
+  return `
+    <div class="filter-bar">
+      <label>选择学生：</label>
+      <select id="studentSelect" onchange="onStudentChange()" style="min-width:140px">${options}</select>
+      <label style="margin-left:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="compareToggle" onchange="onStudentChange()"> 🔄 趋势对比
+      </label>
+      <span id="compareTargets" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="studentContent"></div>
+  `;
+}
+
+function onStudentChange() {
+  const cmp = document.getElementById('compareToggle');
+  studentState.compareMode = cmp ? cmp.checked : false;
+  studentState.compareNames = [];
+  const sel = document.getElementById('studentSelect');
+  if (sel) studentState.compareNames.push(sel.value);
+  renderStudent();
+}
+
+function renderStudent() {
+  const sel = document.getElementById('studentSelect');
+  if (!sel) return;
+  const name = sel.value;
+  const cmp = document.getElementById('compareToggle');
+  studentState.compareMode = cmp ? cmp.checked : false;
+
+  const traj = getStudentTrajectory(name);
+  if (!traj.length) { document.getElementById('studentContent').innerHTML = '<p>无数据</p>'; return; }
+
+  const latest = getLatestExam();
+  const fullChecked = studentState.fullRange ? 'checked' : '';
+  const schools = studentState.compareMode ? state.students.map(s => `<option value="${s}">${s}</option>`).join('') : '';
+
+  document.getElementById('studentContent').innerHTML = `
+    <!-- Row 1: 排名趋势 -->
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>📈 排名趋势 — ${studentState.compareMode ? '多人对比' : name}</span>
+        <div class="rank-mode-bar">
+          <span class="toggle-label">自适应</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="rankRangeToggle" ${fullChecked} onchange="toggleRankRange(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">全范围</span>
+        </div>
+      </div>
+      ${studentState.compareMode ? `
+      <div class="filter-bar" style="margin-bottom:8px">
+        <label>对比学生（Ctrl多选，最多4人）：</label>
+        <select id="compareSelect" multiple size="3" style="min-width:240px;height:70px" onchange="updateCompareNames()">${schools}</select>
+      </div>` : ''}
+      <div class="chart-container tall"><canvas id="chartStuRank"></canvas></div>
+    </div>
+
+    <!-- Row 2: 六科趋势 + 雷达图 -->
+    <div class="card-grid grid-2">
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>🧬 六科趋势 — ${studentState.compareMode ? '对比' : name}</span>
+          <div class="analysis-mode-bar" style="margin-bottom:0">
+            <button class="mode-pill ${studentState.subjMode==='rank'?'active':''}" onclick="setSubjMode('rank')">班排</button>
+            <button class="mode-pill ${studentState.subjMode==='schoolRank'?'active':''}" onclick="setSubjMode('schoolRank')">校排</button>
+            <button class="mode-pill ${studentState.subjMode==='deviation'?'active':''}" onclick="setSubjMode('deviation')">离均差%</button>
+          </div>
+        </div>
+        <div class="chart-container tall"><canvas id="chartStuSubj"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>🎯 六科优劣势分析</span>
+          <div class="analysis-mode-bar" style="margin-bottom:0">
+            <span style="font-size:11px;color:var(--muted)">模式：</span>
+            <button class="mode-pill active" id="radarBtnDev" onclick="renderStudentRadar('deviationPercent', this)">离均差%</button>
+            <button class="mode-pill" id="radarBtnRank" onclick="renderStudentRadar('rank', this)">折算排名</button>
+          </div>
+        </div>
+        <div class="filter-bar" style="margin-bottom:6px">
+          <span style="font-size:11px;color:var(--muted)">场次（多选 Ctrl/Shift）：</span>
+          <select id="radarExamSelect" multiple size="4" style="min-width:180px;height:75px;font-size:12px" onchange="updateRadarExams()">
+            ${state.exams.map((e, i) => `<option value="${e}" ${e===latest?'selected':''}>📅 ${e}</option>`).join('')}
+          </select>
+          <button class="btn btn-outline btn-sm" id="radarPlayBtn" onclick="toggleRadarAnim()">▶ 播放演变</button>
+        </div>
+        <div class="chart-container tall"><canvas id="chartStuRadar"></canvas></div>
+        <div class="radar-note" id="radarNote"></div>
+      </div>
+    </div>
+
+    <!-- Row 3: 对比模式总分趋势 + 明细表 -->
+    ${studentState.compareMode ? `
+    <div class="card">
+      <div class="card-title">📊 总分趋势对比</div>
+      <div class="chart-container tall"><canvas id="chartCompareTotal"></canvas></div>
+    </div>` : ''}
+    <div class="card" style="overflow-x:auto">
+      <div class="card-title">📋 历次成绩明细</div>
+      <table class="data-table">
+        <tr><th>场次</th><th>总分</th><th>校排</th><th>班排</th><th>变化</th>${state.subjects.map(s=>`<th>${s}</th>`).join('')}</tr>
+        ${traj.map(r => `
+          <tr class="${parseFloat(r['变化'])>0?'rank-up':parseFloat(r['变化'])<0?'rank-down':''}">
+            <td>${r['场次']}</td><td><b>${r['总分']}</b></td><td>${r['校排']}</td><td>${r['班排']}</td>
+            <td class="${parseFloat(r['变化'])>0?'text-green':parseFloat(r['变化'])<0?'text-red':''}">${r['变化']!=null?(parseFloat(r['变化'])>0?'↑':'↓')+Math.abs(r['变化']):'—'}</td>
+            ${state.subjects.map(s => `<td>${r[s]||'—'}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+  `;
+  setTimeout(() => initStudentCharts('deviation'), 50);
+}
+
+function toggleRankRange(checked) { studentState.fullRange = checked; initStudentCharts(); }
+function setSubjMode(mode) { studentState.subjMode = mode; initStudentCharts(); }
+function updateCompareNames() {
+  const cs = document.getElementById('compareSelect');
+  if (!cs) return;
+  studentState.compareNames = [...cs.selectedOptions].slice(0,4).map(o=>o.value);
+  const el = document.getElementById('compareTargets');
+  if (el) el.textContent = studentState.compareNames.length>1 ? '🟢 已选: '+studentState.compareNames.join(', ') : '';
+  initStudentCharts();
+}
+function updateRadarExams() {
+  const sel = document.getElementById('radarExamSelect');
+  if (!sel) return;
+  studentState.radarExams = [...sel.selectedOptions].map(o => o.value);
+  if (studentState.radarAnimating) return; // Don't redraw while animating
+  initStudentCharts();
+}
+function toggleRadarAnim() {
+  const btn = document.getElementById('radarPlayBtn');
+  if (!btn) return;
+  studentState.radarAnimating = !studentState.radarAnimating;
+  if (studentState.radarAnimating) {
+    btn.textContent = '⏸ 停止';
+    btn.classList.add('btn-primary'); btn.classList.remove('btn-outline');
+    playRadarAnim();
+  } else {
+    btn.textContent = '▶ 播放演变';
+    btn.classList.remove('btn-primary'); btn.classList.add('btn-outline');
+    if (studentState.radarAnimInterval) clearInterval(studentState.radarAnimInterval);
+  }
+}
+function playRadarAnim() {
+  if (studentState.radarAnimInterval) clearInterval(studentState.radarAnimInterval);
+  const exams = studentState.radarExams.length ? studentState.radarExams : [getLatestExam()];
+  let idx = 0;
+  document.getElementById('radarPlayBtn').textContent = '⏸ 停止 (' + exams[idx] + ')';
+  drawRadarChart(exams[idx]); // Show first immediately
+  studentState.radarAnimInterval = setInterval(() => {
+    if (!studentState.radarAnimating) { clearInterval(studentState.radarAnimInterval); return; }
+    idx = (idx + 1) % exams.length;
+    document.getElementById('radarPlayBtn').textContent = '⏸ 停止 (' + exams[idx] + ')';
+    drawRadarChart(exams[idx]);
+  }, 1200);
+}
+function renderStudentRadar(mode, btn) {
+  btn.parentElement.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const sel = document.getElementById('radarExamSelect');
+  if (sel && !studentState.radarExams.length) {
+    studentState.radarExams = [...sel.selectedOptions].map(o => o.value);
+  }
+  initStudentCharts(mode);
+}
+
+// Standalone radar draw for animation
+function drawRadarChart(examName, mode) {
+  const name = document.getElementById('studentSelect')?.value;
+  if (!name || !examName) return;
+  const m = mode || document.querySelector('#radarBtnDev.active') ? 'deviationPercent' : 'rank';
+  // Detect active mode
+  const activeBtn = document.querySelector('#radarBtnDev.active, #radarBtnRank.active');
+  const radarMode = activeBtn && activeBtn.id === 'radarBtnRank' ? 'rank' : 'deviationPercent';
+  const radarData = getSubjectAdvantageData(name, examName, radarMode);
+  if (!radarData || !radarData.labels.length) return;
+  const isDev = radarMode === 'deviationPercent';
+  const rc = isDev ? { border: '#4472C4', bg: 'rgba(68,114,196,0.2)' } : { border: '#27AE60', bg: 'rgba(39,174,96,0.2)' };
+  const ch = state.charts['stuRadar'];
+  if (ch) {
+    ch.data.labels = radarData.labels;
+    ch.data.datasets = [{ label: examName + (isDev?'离均差%':'折算排名'), data: radarData.values, borderColor: rc.border, backgroundColor: rc.bg, borderWidth: 2, pointRadius: 4, pointBackgroundColor: rc.border }];
+    ch.options.scales.r.min = radarData.minVal;
+    ch.options.scales.r.max = radarData.maxVal;
+    if (isDev) ch.options.scales.r.ticks = { callback: v => (v>0?'+':'')+v+'%', stepSize: Math.max(1, Math.ceil((radarData.maxVal-radarData.minVal)/6)) };
+    else { ch.options.scales.r.ticks = {}; }
+    ch.options.plugins.tooltip.callbacks.label = ctx => {
+      const m = radarData.meta[ctx.dataIndex];
+      return isDev ? ctx.label+': '+m.score+'分 | 班均'+m.classAvg+' | 离均'+m.deviationPercent+'%  | 校排'+m.schoolRank
+                   : ctx.label+': '+m.score+'分 | 折算'+m.normalized+'分 | 校排'+m.schoolRank;
+    };
+    ch.update('active');
+  }
+  const noteEl = document.getElementById('radarNote');
+  if (noteEl) noteEl.innerHTML = isDev ? '💡 <b>离均差%</b> = (得分−均分)/均分×100。正值高均分，负值低均分。当前场次：<b>'+examName+'</b>' : '💡 <b>折算排名</b> = (1−校排/1334)×100。排名越前数值越高。当前场次：<b>'+examName+'</b>';
+}
+
+function initStudentCharts(radarMode) {
+  const name = document.getElementById('studentSelect')?.value;
+  if (!name) return;
+  const traj = getStudentTrajectory(name);
+  if (!traj.length) return;
+  const fullRange = studentState.fullRange;
+
+  // ===== 排名趋势图 =====
+  if (studentState.compareMode && studentState.compareNames.length > 1) {
+    // 多人对比模式
+    const compColors = ['#E74C3C','#4472C4','#27AE60','#F39C12'];
+    const datasets = studentState.compareNames.map((n, i) => {
+      const t = getStudentTrajectory(n);
+      return {
+        label: n, data: t.map(r => parseFloat(r['校排'])),
+        borderColor: compColors[i%4], backgroundColor: compColors[i%4]+'18',
+        fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2
+      };
+    });
+    createChart('chartStuRank', {
+      type: 'line', data: { labels: state.exams, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { reverse: true, title: { display: true, text: '年级排名' }, ...(fullRange?{min:1,max:1334}:{}) } },
+        plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': 第' + ctx.parsed.y + '名' } } }
+      }
+    }, 'stuRank');
+  } else {
+    // 单人：班排+校排双线
+    const classRanks = traj.map(r => parseFloat(r['班排']));
+    const schoolRanks = traj.map(r => parseFloat(r['校排']));
+    createChart('chartStuRank', {
+      type: 'line', data: {
+        labels: state.exams,
+        datasets: [
+          { label: '班级排名', data: classRanks, borderColor: '#E74C3C', backgroundColor: 'rgba(231,76,60,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#E74C3C', borderWidth: 2, yAxisID: 'y' },
+          { label: '年级排名', data: schoolRanks, borderColor: '#4472C4', backgroundColor: 'rgba(68,114,196,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#4472C4', borderWidth: 2, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': 第' + ctx.parsed.y + '名' } } },
+        scales: {
+          y: { type: 'linear', position: 'left', reverse: true, title: { display: true, text: '班级排名', color: '#E74C3C' }, ...(fullRange ? { min: 1, max: 59 } : {}) },
+          y1: { type: 'linear', position: 'right', reverse: true, title: { display: true, text: '年级排名', color: '#4472C4' }, grid: { drawOnChartArea: false }, ...(fullRange ? { min: 1, max: 1334 } : {}) }
+        }
+      }
+    }, 'stuRank');
+  }
+
+  // ===== 六科趋势图（支持班排/校排/离均差%切换） =====
+  const subjMode = studentState.subjMode;
+  const compNames = studentState.compareMode && studentState.compareNames.length > 1 ? studentState.compareNames : [name];
+  const subjColors = ['#4472C4','#2E86C1','#1ABC9C','#27AE60','#F39C12','#E74C3C'];
+  const strokeStyles = ['', [5,3], [2,2], [10,4]];
+
+  if (compNames.length > 1) {
+    // 多人对比模式
+    const subjDatasets = [];
+    state.subjects.forEach((sub, si) => {
+      compNames.forEach((n, ni) => {
+        const t = getStudentTrajectory(n);
+        const data = t.map(r => {
+          if (subjMode === 'rank') return parseFloat(r[sub+'班排']) || null;
+          if (subjMode === 'schoolRank') return parseFloat(r[sub+'校排']) || null;
+          const score = parseFloat(r[sub]);
+          const avg = parseFloat(getClassAvg(r['场次'], sub));
+          return (isNaN(score)||isNaN(avg)) ? null : parseFloat(((score-avg)/avg*100).toFixed(1));
+        });
+        subjDatasets.push({
+          label: sub+'('+n+')', data,
+          borderColor: subjColors[si],
+          borderDash: ni>0 ? strokeStyles[Math.min(ni,3)] : undefined,
+          tension: 0.3, pointRadius: 2,
+          borderWidth: ni===0?2:1.5
+        });
+      });
+    });
+    createChart('chartStuSubj', {
+      type: 'line', data: { labels: state.exams, datasets: subjDatasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { reverse: subjMode!=='deviation',
+            title: { display: true, text: subjMode==='rank'?'班级排名':subjMode==='schoolRank'?'年级排名':'离均差%' } }
+        }
+      }
+    }, 'stuSubj');
+  } else {
+    // 单人模式
+    const datasets = state.subjects.map((s,i) => {
+      const data = traj.map(r => {
+        if (subjMode === 'rank') return parseFloat(r[s+'班排']) || null;
+        if (subjMode === 'schoolRank') return parseFloat(r[s+'校排']) || null;
+        const score = parseFloat(r[s]);
+        const avg = parseFloat(getClassAvg(r['场次'], s));
+        return (isNaN(score)||isNaN(avg)) ? null : parseFloat(((score-avg)/avg*100).toFixed(1));
+      });
+      return { label: s, data, borderColor: subjColors[i], tension: 0.3, pointRadius: 3, borderWidth: 2 };
+    });
+    createChart('chartStuSubj', {
+      type: 'line', data: { labels: state.exams, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { reverse: subjMode!=='deviation',
+            title: { display: true, text: subjMode==='rank'?'班级排名':subjMode==='schoolRank'?'年级排名':'离均差%' } }
+        }
+      }
+    }, 'stuSubj');
+  }
+
+  // ===== 雷达图（支持多场次+动画）=====
+  const examsForRadar = studentState.radarExams.length ? studentState.radarExams : [getLatestExam()];
+  const activeBtn = document.querySelector('#radarBtnDev.active, #radarBtnRank.active');
+  const rMode = (activeBtn && activeBtn.id === 'radarBtnRank') ? 'rank' : (radarMode || 'deviationPercent');
+  const allData = examsForRadar.map(e => ({ exam: e, data: getSubjectAdvantageData(name, e, rMode) })).filter(d => d.data && d.data.labels.length);
+  if (allData.length) {
+    const isDev = rMode === 'deviationPercent';
+    const colors = ['\x234472C4','\x23E74C3C','\x2327AE60','\x23F39C12','\x231ABC9C','\x239B59B6'];
+    const globalMin = Math.min(...allData.map(d => d.data.minVal));
+    const globalMax = Math.max(...allData.map(d => d.data.maxVal));
+    const datasets = allData.map((d, i) => {
+      const rc = i === 0
+        ? { border: isDev ? '\x234472C4' : '\x2327AE60', bg: isDev ? 'rgba(68,114,196,0.15)' : 'rgba(39,174,96,0.15)' }
+        : { border: colors[i%colors.length]+'88', bg: colors[i%colors.length]+'10' };
+      return { label: d.exam, data: d.data.values, borderColor: rc.border, backgroundColor: rc.bg, borderWidth: i===0?2.5:1.5, pointRadius: i===0?4:3, pointBackgroundColor: rc.border };
+    });
+    createChart('chartStuRadar', {
+      type: 'radar', data: { labels: allData[0].data.labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+        scales: { r: { min: globalMin, max: globalMax, ...(isDev?{ticks:{callback:v=>(v>0?'+':'')+v+'%',stepSize:Math.max(1,Math.ceil((globalMax-globalMin)/6))}}:{}), pointLabels:{font:{size:13,weight:'bold'}} } },
+        plugins: { tooltip: { callbacks: { label: ctx => { const m=allData[ctx.datasetIndex].data.meta[ctx.dataIndex]; return isDev ? ctx.dataset.label+': '+m.score+'分 | 离均'+m.deviationPercent+'% | 校排'+m.schoolRank : ctx.dataset.label+': '+m.score+'分 | 折算'+m.normalized+'分 | 校排'+m.schoolRank; } } } }
+      }
+    }, 'stuRadar');
+    const noteEl = document.getElementById('radarNote');
+    if (noteEl) noteEl.innerHTML = isDev
+      ? '💡 <b>离均差%</b>=(得分−均分)/均分×100。'+allData.length+'场叠加。点击「播放演变」可渐变回放。'
+      : '💡 <b>折算排名</b>=(1−校排/1334)×100。'+allData.length+'场叠加。点击「播放演变」可渐变回放。';
+  }
+  // ===== 对比模式：总分趋势 =====
+  if (studentState.compareMode && studentState.compareNames.length > 1) {
+    const compColors = ['#E74C3C','#4472C4','#27AE60','#F39C12'];
+    const ds = studentState.compareNames.map((n, i) => {
+      const t = getStudentTrajectory(n);
+      return { label: n, data: t.map(r=>parseFloat(r['总分'])), borderColor: compColors[i%4], borderWidth: 2, tension: 0.3, pointRadius: 4 };
+    });
+    createChart('chartCompareTotal', { type: 'line', data: { labels: state.exams, datasets: ds }, options: { responsive: true, maintainAspectRatio: false } }, 'cmpTotal');
+  }
+}
+
+// TAB 3: RANKING
+// ============================================================
+function renderRankingTab() {
+  const examOptions = state.exams.map(e => `<option value="${e}" ${e===getLatestExam()?'selected':''}>${e}</option>`).join('');
+  return `
+    <div class="filter-bar">
+      <label>选择场次：</label>
+      <select id="rankingExam" onchange="renderRanking()">${examOptions}</select>
+      <input type="text" id="rankingSearch" placeholder="搜索姓名/组别..." oninput="renderRanking()" style="width:160px">
+    </div>
+    <div id="rankingContent"></div>
+  `;
+}
+
+function renderRanking() {
+  const examEl = document.getElementById('rankingExam');
+  const searchEl = document.getElementById('rankingSearch');
+  if (!examEl) return;
+  const exam = examEl.value;
+  let data = getExamData(exam);
+  if (searchEl && searchEl.value) {
+    const kw = searchEl.value.toLowerCase();
+    data = data.filter(r => (r['姓名']+'').toLowerCase().includes(kw) || (r['组别']+'').toLowerCase().includes(kw));
+  }
+
+  document.getElementById('rankingContent').innerHTML = `
+    <div class="card-grid grid-2">
+      <div class="card" style="overflow-x:auto">
+        <div class="card-title">🏆 ${exam} 总排名</div>
+        <table class="data-table">
+          <tr><th>#</th><th>姓名</th><th>组别</th><th>总分</th><th>校排</th><th>班排</th>${state.subjects.map(s=>`<th>${s}</th>`).join('')}</tr>
+          ${data.map((r,i) => `
+            <tr>
+              <td><span class="rank-badge ${i<3?'rank-'+(i+1):'rank-other'}">${i+1}</span></td>
+              <td style="text-align:left;font-weight:600">${r['姓名']}</td><td>${r['组别']}</td>
+              <td><b>${r['总分']}</b></td><td>${r['校排']}</td><td>${r['班排']}</td>
+              ${state.subjects.map(s=>`<td>${r[s]||'—'}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Top10 总分对比</div>
+        <div class="chart-container tall"><canvas id="chartRankTop"></canvas></div>
+      </div>
+    </div>
+  `;
+  setTimeout(initRankingCharts, 50);
+}
+
+function initRankingCharts() {
+  const exam = document.getElementById('rankingExam')?.value;
+  if (!exam) return;
+  const data = getExamData(exam).slice(0, 10);
+  createChart('chartRankTop', {
+    type: 'bar',
+    data: {
+      labels: data.map(r => r['姓名']),
+      datasets: [{ label: '总分', data: data.map(r=>parseFloat(r['总分'])), backgroundColor: '#4472C4' }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  }, 'rankTop');
+}
+
+// ============================================================
+// TAB 4: GROUP ANALYSIS
+// ============================================================
+function renderGroupTab() {
+  const examOptions = state.exams.map(e => `<option value="${e}" ${e===getLatestExam()?'selected':''}>${e}</option>`).join('');
+  return `
+    <div class="filter-bar">
+      <label>选择场次：</label>
+      <select id="groupExam" onchange="renderGroupAnalysis()">${examOptions}</select>
+    </div>
+    <div id="groupContent"></div>
+  `;
+}
+
+function renderGroupAnalysis() {
+  const examEl = document.getElementById('groupExam');
+  if (!examEl) return;
+  const exam = examEl.value;
+  const groups = getGroupAnalysis(exam);
+
+  document.getElementById('groupContent').innerHTML = `
+    <div class="card-grid grid-2">
+      <div class="card">
+        <div class="card-title">👥 小组平均分对比（${exam}）</div>
+        <div class="chart-container tall"><canvas id="chartGroupBar"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏅 小组排名（按均分）</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${groups.map((g,i) => `
+            <div class="group-card" style="border-left-color:${['#D4AC0D','#95A5A6','#CD7F32','#4472C4','#4472C4','#4472C4','#4472C4','#4472C4','#4472C4'][i]}">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="group-name">#${i+1} ${g.name}</span>
+                <span style="font-size:12px;color:var(--muted)">${g.count}人</span>
+              </div>
+              <div style="display:flex;gap:24px;margin-top:6px">
+                <span>均分 <b style="color:var(--primary-dark);font-size:18px">${g.avgTotal}</b></span>
+                <span>均排名 <b style="color:var(--muted)">${g.avgRank}</b></span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📈 各组均分趋势</div>
+      <div class="filter-bar">
+        <label>选择小组（最多3个）：</label>
+        <div id="groupCheckboxes" style="display:flex;gap:12px;flex-wrap:wrap">
+          ${state.groups.map((g,i) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" value="${g}" ${i<3?'checked':''} onchange="renderGroupTrend()"> ${g}
+          </label>`).join('')}
+        </div>
+      </div>
+      <div class="chart-container tall"><canvas id="chartGroupTrend"></canvas></div>
+    </div>
+  `;
+  setTimeout(initGroupCharts, 50);
+}
+
+function renderGroupTrend() {
+  const checked = [...document.querySelectorAll('#groupCheckboxes input:checked')].map(cb => cb.value);
+  const colors = ['#4472C4','#E74C3C','#27AE60','#F39C12','#1ABC9C','#9B59B6'];
+  const datasets = checked.map((g, i) => {
+    const avgs = state.exams.map(e => {
+      const rows = state.rawData.filter(r => String(r['场次']||'').trim()===e && String(r['组别']||'').trim()===g);
+      const vals = rows.map(r => parseFloat(r['总分'])).filter(v=>!isNaN(v));
+      return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
+    });
+    return { label: g, data: avgs, borderColor: colors[i%colors.length], tension: 0.3, fill: false, pointRadius: 4 };
+  });
+  createChart('chartGroupTrend', {
+    type: 'line', data: { labels: state.exams, datasets },
+    options: { responsive: true, maintainAspectRatio: false }
+  }, 'groupTrend');
+}
+
+function initGroupCharts() {
+  const exam = document.getElementById('groupExam')?.value;
+  if (!exam) return;
+  const groups = getGroupAnalysis(exam);
+  createChart('chartGroupBar', {
+    type: 'bar',
+    data: {
+      labels: groups.map(g => g.name),
+      datasets: [{ label: '均分', data: groups.map(g=>parseFloat(g.avgTotal)), backgroundColor: '#4472C4' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  }, 'groupBar');
+  renderGroupTrend();
+}
+
+// ============================================================
+// ============================================================
+// TAB 5: ENHANCED CHANGES ANALYSIS
+// ============================================================
+const changesState = { metric: 'schoolRank', subjTab: '总分', stepTopN: 10 };
+
+// ===== Heatmap cell helper =====
+function heatmapClass(val) {
+  if (val == null || isNaN(val)) return 'hm-flat';
+  if (val > 80) return 'hm-up-3';
+  if (val > 40) return 'hm-up-2';
+  if (val > 0)  return 'hm-up-1';
+  if (val === 0) return 'hm-flat';
+  if (val > -40) return 'hm-dn-1';
+  if (val > -80) return 'hm-dn-2';
+  return 'hm-dn-3';
+}
+
+// ===== Get change value by metric =====
+function getMetricVal(entry, subjTab, metric) {
+  if (subjTab === '总分') {
+    if (metric === 'schoolRank') return entry.rankChange;
+    if (metric === 'classRank')  return entry.classChange;
+    if (metric === 'deviation') {
+      const fromAvg = parseFloat(getClassAvg(
+        document.getElementById('changesFrom')?.value || '', '总分'));
+      const toAvg = parseFloat(getClassAvg(
+        document.getElementById('changesTo')?.value || '', '总分'));
+      if (fromAvg && toAvg && fromAvg > 0 && toAvg > 0) {
+        const fromDev = (entry.fromTot - fromAvg) / fromAvg * 100;
+        const toDev = (entry.toTot - toAvg) / toAvg * 100;
+        return parseFloat((toDev - fromDev).toFixed(1));
+      }
+      return null;
+    }
+  } else {
+    const s = entry.subjects[subjTab];
+    if (!s) return null;
+    if (metric === 'schoolRank') return s.sRankChange;
+    if (metric === 'classRank')  return s.cRankChange;
+    if (metric === 'deviation')  return s.devChange;
+  }
+  return null;
+}
+
+function getMetricLabel(metric) {
+  if (metric === 'schoolRank') return '校排变化';
+  if (metric === 'classRank') return '班排变化';
+  return '离均差变化(%)';
+}
+
+function renderChangesTab() {
+  changesState.metric = changesState.metric || 'schoolRank';
+  const fromOpts = state.exams.map(e => `<option value="${e}">${e}</option>`).join('');
+  const toOpts = state.exams.map(e => `<option value="${e}" ${e===getLatestExam()?'selected':''}>${e}</option>`).join('');
+  const fromLast = state.exams.length > 1 ? state.exams[state.exams.length-2] : state.exams[0];
+  const metricOpts = [
+    { v:'schoolRank', l:'校排变化' },
+    { v:'classRank', l:'班排变化' },
+    { v:'deviation', l:'离均差%变化' }
+  ];
+  return `
+    <div class="filter-bar">
+      <label>从：</label><select id="changesFrom" onchange="renderChanges()">${fromOpts.replace(`value="${fromLast}"`,`value="${fromLast}" selected`)}</select>
+      <label>到：</label><select id="changesTo" onchange="renderChanges()">${toOpts}</select>
+      <span style="color:var(--border);margin:0 4px">|</span>
+      <label>指标：</label>
+      ${metricOpts.map(m => `<button class="mode-pill ${changesState.metric===m.v?'active':''}" onclick="switchMetric('${m.v}')">${m.l}</button>`).join('')}
+    </div>
+    <div id="changesContent"></div>
+  `;
+}
+
+function switchMetric(metric) {
+  changesState.metric = metric;
+  document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderChanges();
+}
+
+function switchSubjectTab(subj) {
+  changesState.subjTab = subj;
+  document.querySelectorAll('.subject-pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  renderChangesTables();
+}
+
+function renderChanges() {
+  const fromEl = document.getElementById('changesFrom');
+  const toEl = document.getElementById('changesTo');
+  if (!fromEl || !toEl) return;
+  const changes = getNetChanges(fromEl.value, toEl.value);
+
+  changesState.subjTab = '总分';
+
+  const metricLabel = getMetricLabel(changesState.metric);
+
+  // Summary
+  let upCount = 0, dnCount = 0, flatCount = 0, sumChange = 0, valCount = 0;
+  const vals = [];
+  for (const c of changes) {
+    const v = getMetricVal(c, '总分', changesState.metric);
+    if (v == null) continue;
+    vals.push(v);
+    sumChange += v; valCount++;
+    if (v > 0) upCount++;
+    else if (v < 0) dnCount++;
+    else flatCount++;
+  }
+  vals.sort((a,b)=>a-b);
+  const median = vals.length ? vals[Math.floor(vals.length/2)] : 0;
+  const avgCh = valCount ? parseFloat((sumChange/valCount).toFixed(1)) : 0;
+
+  // Per-subject summary
+  const subjSummaries = {};
+  for (const sub of state.subjects) {
+    let up = 0, dn = 0;
+    for (const c of changes) {
+      const v = getMetricVal(c, sub, changesState.metric);
+      if (v == null) continue;
+      if (v > 0) up++;
+      else if (v < 0) dn++;
+    }
+    subjSummaries[sub] = { up, dn };
+  }
+
+  // Metric label for UI
+  const mlLabels = { schoolRank: '名校排', classRank: '名班排', deviation: '%离均' };
+  const mlLabel = mlLabels[changesState.metric] || '名';
+
+  // Compare step range
+  const fromIdx = state.exams.indexOf(fromEl.value);
+  const toIdx = state.exams.indexOf(toEl.value);
+  const stepExams = state.exams.slice(fromIdx, toIdx + 1);
+  const hasSteps = stepExams.length > 2;
+
+  let html = `
+    <!-- Stats row -->
+    <div class="card">
+      <div class="card-title">📈 净变化总览（${fromEl.value} → ${toEl.value}）<span style="font-size:12px;color:var(--muted);font-weight:400">指标：${metricLabel}</span></div>
+      <div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
+        <div class="stat-card"><div class="stat-value" style="color:var(--success)">${upCount}</div><div class="stat-label">进步人数</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${dnCount}</div><div class="stat-label">退步人数</div></div>
+        <div class="stat-card"><div class="stat-value">${flatCount}</div><div class="stat-label">持平人数</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:${avgCh>=0?'var(--success)':'var(--danger)'}">${avgCh>=0?'+':''}${avgCh}</div><div class="stat-label">平均${metricLabel}</div></div>
+        <div class="stat-card"><div class="stat-value">${median>=0?'+':''}${median}</div><div class="stat-label">中位${metricLabel}</div></div>
+      </div>
+      <!-- Per-subject mini cards -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${state.subjects.map(sub => {
+          const s = subjSummaries[sub];
+          return `<div style="background:#f8f9fb;border-radius:8px;padding:8px 14px;text-align:center;min-width:100px">
+            <div style="font-weight:700;font-size:13px">${sub}</div>
+            <div style="font-size:11px;margin-top:2px"><span style="color:var(--success)">↑${s.up}</span> / <span style="color:var(--danger)">↓${s.dn}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // Step trend chart (if range has intermediate exams)
+  if (hasSteps) {
+    html += `
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>📊 分步变化趋势（${stepExams.join(' → ')}）</span>
+        <div class="step-selector">
+          <label>显示：</label>
+          <button class="btn btn-outline btn-sm ${changesState.stepTopN===10?'':'active'}" onclick="changesState.stepTopN=0;renderChanges()">全体</button>
+          <button class="btn btn-outline btn-sm ${changesState.stepTopN===10?'active':''}" onclick="changesState.stepTopN=10;renderChanges()">进步Top10</button>
+          <button class="btn btn-outline btn-sm ${changesState.stepTopN===-10?'active':''}" onclick="changesState.stepTopN=-10;renderChanges()">退步Top10</button>
+        </div>
+      </div>
+      <div class="chart-container tall"><canvas id="chartStepTrend"></canvas></div>
+    </div>`;
+  }
+
+  // Subject tabs + tables
+  const subjTabs = ['总分', ...state.subjects];
+  html += `
+    <div class="subject-pills">
+      ${subjTabs.map(s => `<button class="subject-pill ${changesState.subjTab===s?'active':''}" onclick="switchSubjectTab('${s}')">${s}</button>`).join('')}
+    </div>
+    <div id="changesTables"></div>`;
+
+  document.getElementById('changesContent').innerHTML = html;
+  renderChangesTables();
+  if (hasSteps) setTimeout(initStepTrendChart, 80);
+}
+
+function renderChangesTables() {
+  const fromEl = document.getElementById('changesFrom');
+  const toEl = document.getElementById('changesTo');
+  if (!fromEl || !toEl) return;
+  const changes = getNetChanges(fromEl.value, toEl.value);
+  const subjTab = changesState.subjTab;
+  const metric = changesState.metric;
+  const metricLabel = getMetricLabel(metric);
+  const mlLabel = { schoolRank: '名校排', classRank: '名班排', deviation: '%离均' }[metric] || '名';
+
+  // Build sorted lists
+  const sorted = [...changes].sort((a,b) => {
+    const va = getMetricVal(a, subjTab, metric) || 0;
+    const vb = getMetricVal(b, subjTab, metric) || 0;
+    return vb - va; // desc
+  });
+
+  const upList = sorted.filter(c => (getMetricVal(c, subjTab, metric) || 0) > 0).slice(0, 15);
+  // Regress: sort ascending (most negative first)
+  const dnAll = [...changes].filter(c => (getMetricVal(c, subjTab, metric) || 0) < 0)
+    .sort((a,b) => {
+      const va = getMetricVal(a, subjTab, metric) || 0;
+      const vb = getMetricVal(b, subjTab, metric) || 0;
+      return va - vb; // asc → most negative first
+    });
+  const dnList = dnAll.slice(0, 15);
+
+  // Column builder
+  const colHead = subjTab === '总分'
+    ? `<tr><th>#</th><th>姓名</th><th>组别</th><th>上次${mlLabel}</th><th>本次${mlLabel}</th><th>${metricLabel}</th><th>总分变化</th></tr>`
+    : `<tr><th>#</th><th>姓名</th><th>组别</th><th>上次${mlLabel}</th><th>本次${mlLabel}</th><th>${metricLabel}</th><th>分数变化</th></tr>`;
+
+  const rowBuilder = (c, i, cls, isUp) => {
+    const v = getMetricVal(c, subjTab, metric);
+    const absV = v != null ? Math.abs(v) : '—';
+    const arrow = (v != null && v > 0) ? '↑' : ((v != null && v < 0) ? '↓' : '');
+    const sign = (v != null && v > 0) ? '+' : '';
+
+    if (subjTab === '总分') {
+      const totCh = (c.toTot - c.fromTot).toFixed(1);
+      return `<tr class="${cls}">
+        <td>${i+1}</td><td style="text-align:left;font-weight:600">${c.name}</td><td>${c.group}</td>
+        <td>${metric==='schoolRank'?c.fromRank:metric==='classRank'?c.fromClassRank:'—'}</td>
+        <td>${metric==='schoolRank'?c.toRank:metric==='classRank'?c.toClassRank:'—'}</td>
+        <td class="${isUp?'text-green':'text-red'}">${arrow} ${sign}${absV}${metric==='deviation'?'%':''}</td>
+        <td>${totCh>=0?'+':''}${totCh}</td>
+      </tr>`;
+    } else {
+      const s = c.subjects[subjTab] || {};
+      const scCh = s.scoreChange;
+      return `<tr class="${cls}">
+        <td>${i+1}</td><td style="text-align:left;font-weight:600">${c.name}</td><td>${c.group}</td>
+        <td>${metric==='schoolRank'?(s.fromSRank??'—'):metric==='classRank'?(s.fromCRank??'—'):(s.fromDeviation!=null?s.fromDeviation+'%':'—')}</td>
+        <td>${metric==='schoolRank'?(s.toSRank??'—'):metric==='classRank'?(s.toCRank??'—'):(s.toDeviation!=null?s.toDeviation+'%':'—')}</td>
+        <td class="${isUp?'text-green':'text-red'}">${arrow} ${sign}${absV}${metric==='deviation'?'%':''}</td>
+        <td>${scCh!=null?(scCh>=0?'+':'')+scCh:'—'}</td>
+      </tr>`;
+    }
+  };
+
+  const tablesEl = document.getElementById('changesTables');
+  tablesEl.innerHTML = `
+    <div class="card-grid grid-2">
+      <div class="card" style="overflow-x:auto">
+        <div class="card-title">🚀 ${subjTab} 进步榜 Top15</div>
+        <table class="data-table">
+          ${colHead}
+          ${upList.map((c,i) => rowBuilder(c, i, 'rank-up', true)).join('')}
+          ${upList.length===0?'<tr><td colspan="7" style="color:var(--muted)">无进步数据</td></tr>':''}
+        </table>
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <div class="card-title">⚠️ ${subjTab} 退步预警 Top15</div>
+        <table class="data-table">
+          ${colHead}
+          ${dnList.map((c,i) => rowBuilder(c, i, 'rank-down', false)).join('')}
+          ${dnList.length===0?'<tr><td colspan="7" style="color:var(--muted)">无退步数据</td></tr>':''}
+        </table>
+      </div>
+    </div>
+
+    <!-- Heatmap: Student x Subject -->
+    <div class="card" style="overflow:hidden">
+      <div class="card-title">🗺️ 全科进退步热力图（${getMetricLabel(metric)}，颜色深=幅度大）</div>
+      <div class="heatmap-wrap" style="max-height:580px;overflow-y:auto">
+        <table class="heatmap-table">
+          <tr><th style="min-width:60px">姓名</th><th>组别</th><th>总分</th>${state.subjects.map(s=>`<th>${s}</th>`).join('')}</tr>
+          ${sorted.map(c => {
+            const tv = getMetricVal(c, '总分', metric);
+            const tLabel = tv != null ? (tv>0?'+':'')+tv+(metric==='deviation'?'%':'') : '—';
+            return `<tr>
+              <td>${c.name}</td><td>${c.group}</td>
+              <td class="${heatmapClass(tv)}">${tLabel}</td>
+              ${state.subjects.map(sub => {
+                const sv = getMetricVal(c, sub, metric);
+                const sLabel = sv != null ? (sv>0?'+':'')+sv+(metric==='deviation'?'%':'') : '—';
+                return `<td class="${heatmapClass(sv)}">${sLabel}</td>`;
+              }).join('')}
+            </tr>`;
+          }).join('')}
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+        <span>图例：</span><span class="heatmap-cell hm-up-3">▉</span>大进 <span class="heatmap-cell hm-up-2">▉</span>中进 <span class="heatmap-cell hm-up-1">▉</span>小进
+        <span class="heatmap-cell hm-flat">▉</span>持平
+        <span class="heatmap-cell hm-dn-1">▉</span>小退 <span class="heatmap-cell hm-dn-2">▉</span>中退 <span class="heatmap-cell hm-dn-3">▉</span>大退
+      </div>
+    </div>`;
+}
+
+function initStepTrendChart() {
+  const fromEl = document.getElementById('changesFrom');
+  const toEl = document.getElementById('changesTo');
+  if (!fromEl || !toEl) return;
+
+  const stepData = getStepChanges(fromEl.value, toEl.value, changesState.metric);
+  if (!stepData.steps.length) return;
+
+  const stepLabels = stepData.steps.map(s => s.label);
+
+  // Determine which students to show
+  let targetNames;
+  const changes = getNetChanges(fromEl.value, toEl.value);
+  if (changesState.stepTopN === 10) {
+    targetNames = changes.filter(c => (getMetricVal(c, '总分', changesState.metric) || 0) > 0)
+      .slice(0, 10).map(c => c.name);
+  } else if (changesState.stepTopN === -10) {
+    targetNames = [...changes].filter(c => (getMetricVal(c, '总分', changesState.metric) || 0) < 0)
+      .sort((a,b) => {
+        const va = getMetricVal(a, '总分', changesState.metric) || 0;
+        const vb = getMetricVal(b, '总分', changesState.metric) || 0;
+        return va - vb;
+      }).slice(0, 10).map(c => c.name);
+  } else {
+    targetNames = changes.slice(0, 20).map(c => c.name);
+  }
+
+  const colors = ['#E74C3C','#4472C4','#27AE60','#F39C12','#1ABC9C','#9B59B6','#E67E22','#2ECC71','#34495E','#C0392B'];
+  const datasets = targetNames.map((name, i) => {
+    const data = stepData.steps.map(s => s.students[name] != null ? s.students[name] : null);
+    return {
+      label: name,
+      data,
+      borderColor: colors[i % colors.length],
+      borderWidth: 2,
+      tension: 0.3,
+      pointRadius: 3,
+      pointBackgroundColor: colors[i % colors.length],
+      fill: false,
+    };
+  });
+
+  const canvas = document.getElementById('chartStepTrend');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (state.charts['stepTrend']) state.charts['stepTrend'].destroy();
+  state.charts['stepTrend'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: stepLabels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              const sign = v >= 0 ? '+' : '';
+              return ctx.dataset.label + ': ' + sign + v + (changesState.metric==='deviation'?'%':'');
+            }
+          }
+        },
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function initChangesCharts() {}
+
+// ============================================================
+// REPORT GENERATION
+// ============================================================
+function openReportModal() {
+  if (!state.loaded) { alert('请先加载数据'); return; }
+  const modal = document.getElementById('reportModal');
+  modal.classList.remove('hidden');
+  document.getElementById('reportCheckboxes').innerHTML = `
+    <label><input type="checkbox" checked>📊 班级总览摘要</label>
+    <label><input type="checkbox" checked>📈 成绩趋势图</label>
+    <label><input type="checkbox" checked>🏆 排行榜</label>
+    <label><input type="checkbox" checked>👥 小组对比</label>
+    <label><input type="checkbox" checked>📋 进退步分析</label>
+    <label><input type="checkbox" checked>⚠️ 退步预警名单</label>
+  `;
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').classList.add('hidden');
+}
+
+function generateReport() {
+  if (!state.loaded) return;
+  const checks = [...document.querySelectorAll('#reportCheckboxes input:checked')].map(cb => cb.parentElement.textContent.trim());
+  const latest = getLatestExam();
+  const changes = state.exams.length > 1
+    ? getRankChanges(state.exams[state.exams.length-2], latest) : [];
+
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>高一3班成绩分析报告</title>
+<style>body{font-family:'Microsoft YaHei',sans-serif;max-width:900px;margin:0 auto;padding:20px;color:#2C3E50;line-height:1.8}
+h1{color:#4472C4;border-bottom:3px solid #4472C4;padding-bottom:8px}h2{color:#2E5090;margin-top:24px}
+table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#4472C4;color:#fff;padding:8px}td{padding:6px 8px;border-bottom:1px solid #eee;text-align:center}
+tr:nth-child(even){background:#f8f9fa}.up{color:#27AE60;font-weight:700}.down{color:#E74C3C;font-weight:700}
+.stat{display:inline-block;padding:12px 20px;margin:8px;background:#f0f4ff;border-radius:8px;text-align:center}
+.stat-val{font-size:28px;font-weight:800;color:#4472C4}.stat-lbl{font-size:12px;color:#7F8C8D}
+@media print{body{padding:0}h1{page-break-after:avoid}}</style></head><body>
+<h1>📊 高一3班成绩分析报告</h1>
+<p>生成时间：${new Date().toLocaleDateString('zh-CN')} | 数据范围：${state.exams.length}次考试 | ${state.students.length}人 | ${state.groups.length}组</p>`;
+
+  if (checks.some(c => c.includes('总览'))) {
+    const avg = getClassAvg(latest, '总分');
+    html += `<h2>📋 班级总览摘要</h2>
+<div><span class="stat"><span class="stat-val">${state.exams.length}</span><br><span class="stat-lbl">考试次数</span></span>
+<span class="stat"><span class="stat-val">${state.students.length}</span><br><span class="stat-lbl">学生人数</span></span>
+<span class="stat"><span class="stat-val">${avg||'—'}</span><br><span class="stat-lbl">最新均分(${latest})</span></span></div>
+<h3>各科均分（${latest}）</h3><table><tr><th>学科</th><th>语文</th><th>数学</th><th>英语</th><th>物理</th><th>化学</th><th>生物</th></tr><tr>${state.subjects.map(s=>`<td>${getClassAvg(latest,s)||'—'}</td>`).join('')}</tr></table>`;
+  }
+
+  if (checks.some(c => c.includes('排行榜'))) {
+    const data = getExamData(latest);
+    html += `<h2>🏆 ${latest} 班级排行榜 Top20</h2><table><tr><th>排名</th><th>姓名</th><th>组别</th><th>总分</th><th>校排</th>${state.subjects.map(s=>`<th>${s}</th>`).join('')}</tr>
+${data.slice(0,20).map((r,i)=>`<tr><td>${i+1}</td><td>${r['姓名']}</td><td>${r['组别']}</td><td><b>${r['总分']}</b></td><td>${r['校排']}</td>${state.subjects.map(s=>`<td>${r[s]||'—'}</td>`).join('')}</tr>`).join('')}</table>`;
+  }
+
+  if (checks.some(c => c.includes('进退步')) && changes.length) {
+    const top10 = changes.filter(c=>c.change>0).slice(0,10);
+    html += `<h2>📈 进退步分析（${state.exams[state.exams.length-2]} → ${latest}）</h2>
+<p>进步 ${changes.filter(c=>c.change>0).length} 人 | 退步 ${changes.filter(c=>c.change<0).length} 人</p>
+<h3>进步榜 Top10</h3><table><tr><th>#</th><th>姓名</th><th>上次校排</th><th>本次校排</th><th>变化</th></tr>
+${top10.map((c,i)=>`<tr><td>${i+1}</td><td>${c.name}</td><td>${c.fromRank}</td><td>${c.toRank}</td><td class="up">↑${c.change}</td></tr>`).join('')}</table>`;
+  }
+
+  if (checks.some(c => c.includes('预警')) && changes.length) {
+    const warn = changes.filter(c=>c.change<0).slice(0,10);
+    html += `<h2>⚠️ 退步预警名单</h2><table><tr><th>#</th><th>姓名</th><th>上次校排</th><th>本次校排</th><th>变化</th></tr>
+${warn.map((c,i)=>`<tr><td>${i+1}</td><td>${c.name}</td><td>${c.fromRank}</td><td>${c.toRank}</td><td class="down">↓${Math.abs(c.change)}</td></tr>`).join('')}</table>`;
+  }
+
+  html += '<p style="text-align:center;color:#aaa;margin-top:40px">— 高一3班成绩追踪系统自动生成 —</p></body></html>';
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `高一3班成绩报告_${new Date().toISOString().slice(0,10)}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeReportModal();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+  // Show upload overlay by default
+  document.getElementById('uploadOverlay').classList.remove('hidden');
+  // Try auto-load from relative path
+  loadDemo().catch(() => {});
+})();
+</script>
+</body>
+</html>
