@@ -16,7 +16,7 @@
 
 ## 🌐 在线演示
 
-> **🔗 [https://yunshang3.github.io/edu-ai-dashboard/](https://yunshang3.github.io/edu-ai-dashboard/)**
+> **🔗 [https://teslaliu-181.github.io/edu-ai-dashboard/](https://teslaliu-181.github.io/edu-ai-dashboard/)**
 
 ## ✨ 核心特点
 
