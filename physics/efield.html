@@ -1,0 +1,2391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电场可视化教学工具</title>
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"
+}}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: #0a0e1a; color: #e0e8ff;
+  overflow: hidden; height: 100vh; width: 100vw;
+}
+canvas#main-canvas, canvas#gl-canvas {
+  position: absolute; top: 50px; left: 0;
+  width: calc(100vw - 290px); height: calc(100vh - 50px);
+  cursor: default;
+}
+canvas#gl-canvas { z-index: 1; }
+#header {
+  position: absolute; top: 0; left: 0; right: 0; height: 50px;
+  background: linear-gradient(135deg, rgba(10,20,50,0.95), rgba(20,40,90,0.95));
+  border-bottom: 1px solid rgba(100,150,255,0.3);
+  display: flex; align-items: center; padding: 0 20px; z-index: 100; gap: 16px;
+  backdrop-filter: blur(10px);
+}
+#header h1 { font-size: 18px; font-weight: 700; color: #7ab8ff; letter-spacing: 2px; white-space: nowrap; }
+#header .subtitle { font-size: 12px; color: rgba(150,180,255,0.6); border-left: 1px solid rgba(100,150,255,0.3); padding-left: 16px; }
+.view-tabs { display: flex; gap: 2px; margin-left: auto; }
+.view-tab {
+  padding: 5px 14px; border: 1px solid rgba(80,130,255,0.25); border-radius: 6px;
+  background: rgba(15,25,55,0.6); color: rgba(150,180,255,0.6); font-size: 12px;
+  cursor: pointer; transition: all 0.2s; font-weight: 600;
+}
+.view-tab:hover { border-color: rgba(120,180,255,0.5); color: #b0c8ff; }
+.view-tab.active { background: rgba(40,80,180,0.45); border-color: rgba(100,170,255,0.6); color: #7ab8ff; }
+
+#control-panel {
+  position: absolute; top: 50px; right: 0; width: 290px;
+  background: rgba(8,15,35,0.96);
+  border-left: 1px solid rgba(80,130,255,0.25);
+  z-index: 100; height: calc(100vh - 50px);
+  overflow-y: auto; overflow-x: hidden;
+}
+#control-panel::-webkit-scrollbar { width: 4px; }
+#control-panel::-webkit-scrollbar-track { background: transparent; }
+#control-panel::-webkit-scrollbar-thumb { background: rgba(80,130,255,0.4); border-radius: 2px; }
+
+.panel-section { padding: 14px 16px; border-bottom: 1px solid rgba(80,130,255,0.12); }
+.panel-section:last-child { border-bottom: none; }
+.section-title {
+  font-size: 11px; font-weight: 700; color: rgba(120,170,255,0.7);
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;
+}
+
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preset-btn {
+  padding: 10px 6px; border: 1px solid rgba(80,130,255,0.25); border-radius: 8px;
+  background: rgba(15,25,55,0.8); color: #b0c8ff; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; text-align: center; line-height: 1.3;
+}
+.preset-btn:hover { border-color: rgba(120,180,255,0.6); background: rgba(25,45,90,0.8); transform: translateY(-1px); }
+.preset-btn .icon { font-size: 18px; display: block; margin-bottom: 3px; }
+
+.charge-add-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.btn-add {
+  flex: 1; padding: 9px 8px; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+}
+.btn-add-pos { background: linear-gradient(135deg, #c0392b, #e74c3c); color: #fff; box-shadow: 0 0 12px rgba(231,76,60,0.3); }
+.btn-add-neg { background: linear-gradient(135deg, #1a5276, #2980b9); color: #fff; box-shadow: 0 0 12px rgba(41,128,185,0.3); }
+.btn-add:hover { transform: translateY(-1px); filter: brightness(1.15); }
+
+#charge-list { display: flex; flex-direction: column; gap: 6px; }
+.charge-item {
+  background: rgba(20,35,70,0.7); border: 1px solid rgba(80,130,255,0.2);
+  border-radius: 8px; padding: 8px 10px; transition: border-color 0.2s;
+}
+.charge-item:hover { border-color: rgba(120,180,255,0.5); }
+.charge-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.charge-badge {
+  width: 22px; height: 22px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 13px; font-weight: 900; flex-shrink: 0;
+}
+.charge-badge.pos { background: #e74c3c; color: #fff; box-shadow: 0 0 8px rgba(231,76,60,0.6); }
+.charge-badge.neg { background: #2980b9; color: #fff; box-shadow: 0 0 8px rgba(41,128,185,0.6); }
+.charge-name { font-size: 12px; color: #b0c8ff; flex: 1; }
+.charge-coords { font-size: 10px; color: rgba(150,180,255,0.5); font-family: 'Courier New', monospace; }
+.btn-del {
+  background: rgba(180,50,50,0.3); border: 1px solid rgba(180,50,50,0.4);
+  color: #ff8a8a; width: 22px; height: 22px; border-radius: 4px; cursor: pointer;
+  font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.btn-del:hover { background: rgba(180,50,50,0.6); color: #fff; }
+.charge-slider-row { display: flex; align-items: center; gap: 6px; }
+.charge-slider-label { font-size: 10px; color: rgba(150,180,255,0.6); width: 28px; }
+.charge-slider {
+  flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px;
+  background: rgba(60,100,180,0.3); outline: none;
+}
+.charge-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: #5599ff; cursor: pointer; border: 2px solid #2266cc;
+}
+.charge-slider-val { font-size: 10px; color: #7ab8ff; width: 48px; text-align: right; font-family: monospace; }
+
+.opt-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
+.opt-label { font-size: 12px; color: #a0b8e0; }
+.toggle { position: relative; width: 38px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: rgba(40,60,100,0.5);
+  border-radius: 10px; cursor: pointer; transition: 0.3s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  left: 2px; bottom: 2px; background: #556; border-radius: 50%; transition: 0.3s;
+}
+.toggle input:checked + .toggle-slider { background: rgba(60,140,255,0.7); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); background: #7ab8ff; }
+
+.sub-panel {
+  max-height: 0; overflow: hidden; transition: max-height 0.3s; margin-top: 0;
+}
+.sub-panel.visible { max-height: 300px; margin-top: 8px; }
+.sub-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sub-label { font-size: 10px; color: rgba(150,180,255,0.5); width: 52px; flex-shrink: 0; }
+.sub-slider { flex: 1; -webkit-appearance: none; height: 3px; border-radius: 1.5px; background: rgba(60,100,180,0.3); outline: none; }
+.sub-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #5599ff; cursor: pointer; }
+.sub-val { font-size: 10px; color: #7ab8ff; width: 32px; text-align: right; font-family: monospace; }
+
+.btn-small {
+  padding: 5px 10px; border: 1px solid rgba(80,130,255,0.3); border-radius: 6px;
+  background: rgba(20,40,80,0.6); color: #a0c4ff; font-size: 11px; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-small:hover { border-color: rgba(120,180,255,0.6); background: rgba(30,60,120,0.6); }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+#tooltip {
+  display: none; position: absolute; z-index: 200;
+  background: rgba(5,12,30,0.95); border: 1px solid rgba(80,140,255,0.5);
+  border-radius: 8px; padding: 8px 12px; pointer-events: none;
+  backdrop-filter: blur(8px); max-width: 220px;
+}
+#tooltip .tip-title { font-size: 12px; font-weight: 700; color: #7ab8ff; margin-bottom: 4px; }
+#tooltip .tip-content { font-size: 11px; color: #a0b8e0; line-height: 1.5; }
+.tip-val { color: #7ab8ff; font-family: monospace; }
+
+#info-bar {
+  position: absolute; bottom: 0; left: 0; right: 290px; height: 32px;
+  background: rgba(8,15,35,0.9); border-top: 1px solid rgba(80,130,255,0.15);
+  display: flex; align-items: center; padding: 0 16px; gap: 20px;
+  font-size: 11px; color: rgba(150,180,255,0.6); z-index: 50;
+}
+#info-bar .info-item { display: flex; gap: 4px; align-items: center; }
+#info-bar .info-val { color: #7ab8ff; font-family: monospace; }
+#hint-text { flex: 1; text-align: right; font-size: 10px; }
+#hint-text strong { color: rgba(120,170,255,0.8); }
+
+#chart-panel {
+  display: none; position: absolute; z-index: 150;
+  background: rgba(8,15,35,0.96); border: 1px solid rgba(80,130,255,0.35);
+  border-radius: 12px; backdrop-filter: blur(12px); width: 520px;
+  left: 50px; top: 80px; overflow: hidden;
+}
+#chart-panel.visible { display: block; }
+.chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: rgba(15,25,55,0.6);
+  border-bottom: 1px solid rgba(80,130,255,0.15); cursor: move;
+}
+.chart-header-title { font-size: 13px; font-weight: 700; color: #7ab8ff; }
+.chart-close-btn {
+  width: 24px; height: 24px; border: none; border-radius: 4px;
+  background: rgba(180,50,50,0.3); color: #ff8a8a; font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.chart-close-btn:hover { background: rgba(180,50,50,0.6); color: #fff; }
+.chart-body { padding: 12px; }
+.chart-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.chart-controls label { font-size: 11px; color: rgba(150,180,255,0.6); }
+.chart-controls select {
+  background: rgba(20,35,70,0.8); border: 1px solid rgba(80,130,255,0.3);
+  color: #b0c8ff; padding: 3px 6px; border-radius: 4px; font-size: 11px;
+}
+.chart-canvas-wrap { width: 100%; height: 220px; position: relative; }
+#chart-canvas { width: 100%; height: 100%; border-radius: 6px; background: rgba(5,10,25,0.8); }
+.chart-view-tabs { display: flex; gap: 2px; margin-bottom: 10px; }
+.chart-vtab {
+  flex: 1; padding: 5px 6px; border: 1px solid rgba(80,130,255,0.25); border-radius: 5px;
+  background: rgba(15,25,55,0.6); color: rgba(150,180,255,0.6); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.chart-vtab:hover { border-color: rgba(120,180,255,0.5); color: #b0c8ff; }
+.chart-vtab.active { background: rgba(40,80,180,0.4); border-color: rgba(100,170,255,0.5); color: #7ab8ff; }
+.chart-path-section { margin-bottom: 8px; }
+.chart-path-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cam-presets { display: flex; gap: 3px; margin-left: 12px; }
+.cam-btn {
+  padding: 4px 10px; border: 1px solid rgba(80,130,255,0.3); border-radius: 5px;
+  background: rgba(15,25,55,0.7); color: rgba(150,180,255,0.7); font-size: 10px;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.cam-btn:hover { border-color: rgba(120,180,255,0.5); color: #b0c8ff; }
+.cam-btn.active { background: rgba(40,80,180,0.4); border-color: rgba(100,170,255,0.5); color: #7ab8ff; }
+
+#gl-toolbar {
+  position: absolute; left: 14px; top: 64px; z-index: 120;
+  display: none; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 10px 12px;
+  background: rgba(8,15,35,0.9);
+  border: 1px solid rgba(100,170,255,0.28);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+}
+#gl-toolbar .gl-toolbar-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+}
+#gl-toolbar .gl-toolbar-label {
+  font-size: 11px; font-weight: 700; color: #9fd0ff; white-space: nowrap; min-width: 86px;
+}
+#gl-toolbar .gl-toolbar-hint {
+  font-size: 10px; color: rgba(150,180,255,0.45); white-space: nowrap;
+}
+#gl-toolbar .gl-toolbar-slider {
+  width: 170px; -webkit-appearance: none; height: 4px; border-radius: 2px;
+  background: rgba(70,120,200,0.35); outline: none;
+}
+#gl-toolbar .gl-toolbar-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: #7ab8ff; cursor: pointer; border: 2px solid #2a69d8;
+}
+#gl-toolbar .gl-toolbar-val {
+  min-width: 34px; text-align: right; font-size: 11px; color: #c7e6ff; font-family: monospace;
+}
+
+#loading {
+  position: fixed; inset: 0; background: #0a0e1a;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; transition: opacity 0.5s;
+}
+#loading span { color: #7ab8ff; font-size: 16px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<div id="loading"><span>初始化中...</span></div>
+
+<div id="header">
+  <h1>⚡ 电场可视化教学工具</h1>
+  <span class="subtitle">库仑定律 · 电场线 · 等势线</span>
+  <div class="view-tabs">
+    <button class="view-tab active" data-mode="2d" onclick="switchView('2d')">2D 场图</button>
+    <button class="view-tab" data-mode="3d" onclick="switchView('3d')">3D 电势面</button>
+  </div>
+  <div class="cam-presets" id="cam-presets" style="display:none;">
+    <button class="cam-btn active" id="cam-free" onclick="setCamPreset('free')">自由</button>
+    <button class="cam-btn" id="cam-xoy" onclick="setCamPreset('xoy')">xOy 俯视</button>
+    <button class="cam-btn" id="cam-xoz" onclick="setCamPreset('xoz')">xOz 正视</button>
+    <button class="cam-btn" id="cam-yoz" onclick="setCamPreset('yoz')">yOz 侧视</button>
+  </div>
+</div>
+
+<canvas id="main-canvas"></canvas>
+<canvas id="gl-canvas" style="display:none;"></canvas>
+<div id="gl-toolbar">
+  <div class="gl-toolbar-row">
+    <span class="gl-toolbar-label">曲面透明度</span>
+    <input
+      type="range"
+      class="gl-toolbar-slider"
+      id="surface-alpha-floating"
+      min="0.08"
+      max="0.85"
+      step="0.02"
+      value="0.38"
+      oninput="updateSurfaceAlpha(parseFloat(this.value))">
+    <span class="gl-toolbar-val" id="alpha-val-floating">0.38</span>
+  </div>
+  <div class="gl-toolbar-row">
+    <span class="gl-toolbar-label">Z轴缩放</span>
+    <input
+      type="range"
+      class="gl-toolbar-slider"
+      id="surface-z-scale-floating"
+      min="0.18"
+      max="1.2"
+      step="0.02"
+      value="0.42"
+      oninput="updateSurfaceZScale(parseFloat(this.value))">
+    <span class="gl-toolbar-val" id="z-scale-val-floating">0.42</span>
+  </div>
+  <span class="gl-toolbar-hint">弱化曲面，强调等势面；缩小 Z 轴可展开中间区域</span>
+</div>
+
+<div id="control-panel">
+  <!-- 预设场景 -->
+  <div class="panel-section">
+    <div class="section-title">预设场景</div>
+    <div class="preset-grid">
+      <button class="preset-btn" onclick="loadPreset('single_pos')"><span class="icon">🔴</span>单正电荷</button>
+      <button class="preset-btn" onclick="loadPreset('single_neg')"><span class="icon">🔵</span>单负电荷</button>
+      <button class="preset-btn" onclick="loadPreset('dipole')"><span class="icon">⚡</span>等量异号</button>
+      <button class="preset-btn" onclick="loadPreset('same_sign')"><span class="icon">🔥</span>等量同号</button>
+      <button class="preset-btn" onclick="loadPreset('capacitor')"><span class="icon">🔲</span>平行板模型</button>
+      <button class="preset-btn" onclick="loadPreset('quadrupole')"><span class="icon">✨</span>四极子</button>
+    </div>
+  </div>
+
+  <!-- 电荷管理 -->
+  <div class="panel-section">
+    <div class="section-title">电荷管理</div>
+    <div class="charge-add-row">
+      <button class="btn-add btn-add-pos" onclick="addCharge(1)">＋ 正电荷</button>
+      <button class="btn-add btn-add-neg" onclick="addCharge(-1)">＋ 负电荷</button>
+    </div>
+    <div id="charge-list">
+      <div style="font-size:11px;color:rgba(150,180,255,0.4);text-align:center;padding:8px 0;">暂无电荷，请添加</div>
+    </div>
+  </div>
+
+  <!-- 显示选项 -->
+  <div class="panel-section">
+    <div class="section-title">显示选项</div>
+    <div class="opt-row">
+      <span class="opt-label">电场线</span>
+      <label class="toggle"><input type="checkbox" checked onchange="toggleOption('fieldLines', this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="opt-row">
+      <span class="opt-label">电荷标签</span>
+      <label class="toggle"><input type="checkbox" checked onchange="toggleOption('labels', this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="opt-row">
+      <span class="opt-label">坐标网格</span>
+      <label class="toggle"><input type="checkbox" checked onchange="toggleOption('grid', this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="opt-row">
+      <span class="opt-label">等势线</span>
+      <label class="toggle"><input type="checkbox" id="tog-equip" onchange="toggleOption('equipotential', this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div id="equip-sub" class="sub-panel">
+      <div class="sub-row">
+        <span class="sub-label">线数</span>
+        <input type="range" class="sub-slider" id="eq-count" min="3" max="20" value="8"
+          oninput="document.getElementById('eq-count-val').textContent=this.value; requestPhysicsUpdate()">
+        <span class="sub-val" id="eq-count-val">8</span>
+      </div>
+      <div class="sub-row">
+        <span class="sub-label">透明度</span>
+        <input type="range" class="sub-slider" id="eq-opacity" min="0.1" max="1" step="0.05" value="0.7"
+          oninput="updateEquipotentialOpacity(parseFloat(this.value))">
+        <span class="sub-val" id="eq-opacity-val">0.70</span>
+      </div>
+      <div class="opt-row" style="padding:2px 0;">
+        <span class="opt-label" style="font-size:11px;">数值标注</span>
+        <label class="toggle"><input type="checkbox" id="eq-labels" onchange="requestRender()"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="opt-row">
+      <span class="opt-label">场强热力图</span>
+      <label class="toggle"><input type="checkbox" onchange="toggleOption('heatmap', this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="sub-panel" style="margin-top:8px;border-top:1px solid rgba(80,130,255,0.12);padding-top:8px;">
+      <div class="sub-row" style="margin-bottom:4px;">
+        <span class="sub-label" style="width:auto;min-width:52px;">3D 精度</span>
+        <input type="range" class="sub-slider" id="quality-slider" min="0" max="5" step="1" value="0"
+          oninput="onQualitySliderChange(this.value)">
+        <span class="sub-val" id="quality-label" style="min-width:32px;text-align:center;">自动</span>
+      </div>
+      <div id="quality-info" style="font-size:9px;color:rgba(150,180,255,0.35);text-align:right;margin-top:2px;"></div>
+      <div class="sub-row" style="margin-top:6px;">
+        <span class="sub-label" style="width:auto;min-width:52px;">曲面透明</span>
+        <input type="range" class="sub-slider" id="surface-alpha" min="0.08" max="0.85" step="0.02" value="0.38"
+          oninput="updateSurfaceAlpha(parseFloat(this.value))">
+        <span class="sub-val" id="alpha-val">0.38</span>
+      </div>
+      <div class="sub-row" style="margin-top:6px;">
+        <span class="sub-label" style="width:auto;min-width:52px;">Z轴缩放</span>
+        <input type="range" class="sub-slider" id="surface-z-scale" min="0.18" max="1.2" step="0.02" value="0.42"
+          oninput="updateSurfaceZScale(parseFloat(this.value))">
+        <span class="sub-val" id="z-scale-val">0.42</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场强探测 -->
+  <div class="panel-section">
+    <div class="section-title">场强探测</div>
+    <div class="opt-row">
+      <span class="opt-label">探测模式</span>
+      <label class="toggle"><input type="checkbox" id="tog-probe" onchange="toggleProbeMode(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div id="probe-list" style="margin-top:6px;"></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn-small" onclick="clearProbes()">清除探头</button>
+    </div>
+  </div>
+
+  <!-- 工具 -->
+  <div class="panel-section">
+    <div class="section-title">工具</div>
+    <div class="btn-row">
+      <button class="btn-small" onclick="toggleChart()">📊 图表分析</button>
+      <button class="btn-small" onclick="resetView()">🔄 重置视图</button>
+      <button class="btn-small" onclick="exportImage()">📷 导出图片</button>
+      <button class="btn-small" onclick="clearAll()">🗑️ 清空场景</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip">
+  <div class="tip-title" id="tip-title"></div>
+  <div class="tip-content" id="tip-content"></div>
+</div>
+
+<div id="info-bar">
+  <div class="info-item">坐标: <span class="info-val" id="info-pos">(0.0, 0.0)</span></div>
+  <div class="info-item">E = <span class="info-val" id="info-E">0 N/C</span></div>
+  <div class="info-item">φ = <span class="info-val" id="info-phi">0 V</span></div>
+  <div id="hint-text"><strong>提示：</strong>滚轮缩放 · 右键平移 · 左键拖拽电荷</div>
+</div>
+
+<!-- 图表分析面板 -->
+<div id="chart-panel">
+  <div class="chart-header">
+    <span class="chart-header-title">📊 场强 / 电势分析</span>
+    <button class="chart-close-btn" onclick="toggleChart()">✕</button>
+  </div>
+  <div class="chart-body">
+    <div class="chart-view-tabs">
+      <button class="chart-vtab active" data-view="both" onclick="setChartView('both',this)">合并分析</button>
+      <button class="chart-vtab" data-view="E" onclick="setChartView('E',this)">场强 E</button>
+      <button class="chart-vtab" data-view="phi" onclick="setChartView('phi',this)">电势 φ</button>
+    </div>
+    <div class="chart-path-section">
+      <div class="chart-path-row">
+        <label>路径:</label>
+        <select id="chart-path-type" onchange="onChartPathTypeChange()">
+          <option value="x">沿X轴 (y=0)</option>
+          <option value="y">沿Y轴 (x=0)</option>
+          <option value="connect">电荷连线方向</option>
+          <option value="perp">连线中垂线</option>
+          <option value="custom">自定义坐标</option>
+          <option value="pick">画布取点 ✦</option>
+        </select>
+        <label>范围:</label>
+        <select id="chart-range" onchange="updateChart()">
+          <option value="10">±10</option>
+          <option value="15" selected>±15</option>
+          <option value="20">±20</option>
+        </select>
+      </div>
+      <div id="chart-custom-row" style="display:none;margin-top:6px;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:10px;color:#a0b8e0;">
+          起点 (<input id="cp-sx" type="number" value="-10" step="0.5" style="width:46px;background:rgba(20,35,70,0.8);border:1px solid rgba(80,130,255,0.3);color:#b0c8ff;padding:2px 4px;border-radius:3px;font-size:10px;">,
+          <input id="cp-sy" type="number" value="0" step="0.5" style="width:46px;background:rgba(20,35,70,0.8);border:1px solid rgba(80,130,255,0.3);color:#b0c8ff;padding:2px 4px;border-radius:3px;font-size:10px;">)
+          → 终点 (<input id="cp-ex" type="number" value="10" step="0.5" style="width:46px;background:rgba(20,35,70,0.8);border:1px solid rgba(80,130,255,0.3);color:#b0c8ff;padding:2px 4px;border-radius:3px;font-size:10px;">,
+          <input id="cp-ey" type="number" value="0" step="0.5" style="width:46px;background:rgba(20,35,70,0.8);border:1px solid rgba(80,130,255,0.3);color:#b0c8ff;padding:2px 4px;border-radius:3px;font-size:10px;">)
+          <button onclick="updateChart()" style="padding:2px 8px;background:rgba(40,80,180,0.5);border:1px solid rgba(100,170,255,0.4);color:#7ab8ff;border-radius:3px;cursor:pointer;font-size:10px;">应用</button>
+        </div>
+      </div>
+      <div id="chart-pick-row" style="display:none;margin-top:6px;">
+        <div style="font-size:10px;color:#00ff88;">⬇ 请在2D画布上依次点击 <b>起点</b> 和 <b>终点</b></div>
+        <div id="chart-pick-info" style="font-size:10px;color:#7ab8ff;margin-top:3px;"></div>
+      </div>
+    </div>
+    <div class="chart-canvas-wrap" style="height:300px;">
+      <canvas id="chart-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+//  Constants
+// ============================================================
+const K_E = 8.99e9;
+const FIELD_LINE_DT = 0.035;
+const MAX_STEPS = 600;
+const MAX_TRACE_R = 35;
+const LINES_PER_NC = 3;
+const MIN_LINES = 6;
+const MAX_LINES_PER_CHARGE = 24;
+const TOTAL_MAX_LINES = 120;
+const CHARGE_RADIUS = 0.4;
+
+// ============================================================
+//  State
+// ============================================================
+const state = {
+  charges: [],
+  probes: [],
+  plates: [],
+  chargeIdCounter: 0,
+  probeIdCounter: 0,
+  selectedCharge: null,
+  isDragging: false,
+  isPanning: false,
+  probeMode: false,
+  show: { fieldLines: true, labels: true, grid: true, equipotential: false, heatmap: false },
+};
+
+const view = { centerX: 0, centerY: 0, scale: 40 };
+
+let canvas, ctx, dpr;
+let needsRender = true;
+let needsPhysics = true;
+let viewMode = '2d';
+
+let cachedFieldLines = [];
+let cachedEquipLines = [];
+let heatmapImage = null;
+
+let mouseWorld = { x: 0, y: 0 };
+let mouseCanvas = { x: 0, y: 0 };
+let panStart = null;
+let dragOffset = { x: 0, y: 0 };
+let currentPreset = 'single_pos';
+
+// 3D Potential Surface state
+const cam3d = {
+  az: -0.54, el: 0.58, dist: 25,
+  target: [0, 0, 0],
+  fov: 45,
+  ortho: false,
+  isDragging: false,
+  lastMouse: null,
+};
+let surface3dCache = null;
+const SURFACE_MAX_Z = 10;
+let surfaceQualityLevel = 0; // 0=auto, 1-5=manual
+let surfaceAlpha = 0.38;
+let surfaceZScaleFactor = 0.42;
+
+const QUALITY_TABLE = [
+  null,
+  { baseN: 40,  refMax: 0.12, refMinStep: 0.06, dedup: 0.04,  wire: false, label: '极速' },
+  { baseN: 55,  refMax: 0.25, refMinStep: 0.04, dedup: 0.028, wire: false, label: '流畅' },
+  { baseN: 72,  refMax: 0.45, refMinStep: 0.025,dedup: 0.018, wire: false, label: '均衡' },
+  { baseN: 95,  refMax: 0.7,  refMinStep: 0.016,dedup: 0.01,  wire: true,  label: '精细' },
+  { baseN: 120, refMax: 0.8,  refMinStep: 0.012,dedup: 0.006, wire: true,  label: '极致' },
+];
+
+function getEffectiveQuality() {
+  if (surfaceQualityLevel > 0) return surfaceQualityLevel;
+  const nc = state.charges.length;
+  if (nc <= 2) return 4;
+  if (nc <= 3) return 3;
+  if (nc <= 5) return 2;
+  return 1;
+}
+
+function getQualityParams() {
+  return QUALITY_TABLE[getEffectiveQuality()];
+}
+
+function onQualitySliderChange(val) {
+  surfaceQualityLevel = parseInt(val);
+  const lbl = surfaceQualityLevel === 0 ? '自动' : QUALITY_TABLE[surfaceQualityLevel].label;
+  document.getElementById('quality-label').textContent = lbl;
+  requestPhysicsUpdate();
+}
+
+function updateSurfaceAlpha(val) {
+  surfaceAlpha = val;
+  if (glSurfaceMat) glSurfaceMat.opacity = surfaceAlpha;
+  const alphaVal = val.toFixed(2);
+  const sideSlider = document.getElementById('surface-alpha');
+  const floatingSlider = document.getElementById('surface-alpha-floating');
+  const sideLabel = document.getElementById('alpha-val');
+  const floatingLabel = document.getElementById('alpha-val-floating');
+  if (sideSlider && Math.abs(parseFloat(sideSlider.value) - val) > 1e-6) sideSlider.value = String(val);
+  if (floatingSlider && Math.abs(parseFloat(floatingSlider.value) - val) > 1e-6) floatingSlider.value = String(val);
+  if (sideLabel) sideLabel.textContent = alphaVal;
+  if (floatingLabel) floatingLabel.textContent = alphaVal;
+  requestRender();
+}
+
+function updateSurfaceZScale(val) {
+  surfaceZScaleFactor = val;
+  const scaleVal = val.toFixed(2);
+  const sideSlider = document.getElementById('surface-z-scale');
+  const floatingSlider = document.getElementById('surface-z-scale-floating');
+  const sideLabel = document.getElementById('z-scale-val');
+  const floatingLabel = document.getElementById('z-scale-val-floating');
+  if (sideSlider && Math.abs(parseFloat(sideSlider.value) - val) > 1e-6) sideSlider.value = String(val);
+  if (floatingSlider && Math.abs(parseFloat(floatingSlider.value) - val) > 1e-6) floatingSlider.value = String(val);
+  if (sideLabel) sideLabel.textContent = scaleVal;
+  if (floatingLabel) floatingLabel.textContent = scaleVal;
+  requestPhysicsUpdate();
+}
+
+function updateEquipotentialOpacity(val) {
+  const opacityVal = val.toFixed(2);
+  const opacitySlider = document.getElementById('eq-opacity');
+  const opacityLabel = document.getElementById('eq-opacity-val');
+  if (opacitySlider && Math.abs(parseFloat(opacitySlider.value) - val) > 1e-6) opacitySlider.value = String(val);
+  if (opacityLabel) opacityLabel.textContent = opacityVal;
+  if (viewMode === '3d') buildGLContours();
+  requestRender();
+}
+
+// ============================================================
+//  Coordinate Transform
+// ============================================================
+function worldToCanvas(wx, wy) {
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  return [
+    (wx - view.centerX) * view.scale + cw / 2,
+    -(wy - view.centerY) * view.scale + ch / 2
+  ];
+}
+function canvasToWorld(cx, cy) {
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  return [
+    (cx - cw / 2) / view.scale + view.centerX,
+    -(cy - ch / 2) / view.scale + view.centerY
+  ];
+}
+function getVisibleBounds() {
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  const [xMin, yMax] = canvasToWorld(0, 0);
+  const [xMax, yMin] = canvasToWorld(cw, ch);
+  return { xMin, xMax, yMin, yMax };
+}
+
+// ============================================================
+//  Physics Engine
+// ============================================================
+function fieldAt(px, py) {
+  let ex = 0, ey = 0;
+  for (const c of state.charges) {
+    const dx = px - c.x, dy = py - c.y;
+    const r2 = Math.max(0.04, dx * dx + dy * dy);
+    const r = Math.sqrt(r2);
+    const f = K_E * c.q / (r2 * r);
+    ex += f * dx;
+    ey += f * dy;
+  }
+  return { x: ex, y: ey };
+}
+
+function fieldMagnitude(px, py) {
+  const e = fieldAt(px, py);
+  return Math.sqrt(e.x * e.x + e.y * e.y);
+}
+
+function potentialAt(px, py) {
+  let v = 0;
+  for (const c of state.charges) {
+    const dx = px - c.x, dy = py - c.y;
+    const r = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
+    v += K_E * c.q / r;
+  }
+  return v;
+}
+
+function fieldDir(px, py) {
+  const e = fieldAt(px, py);
+  const mag = Math.sqrt(e.x * e.x + e.y * e.y);
+  if (mag < 1e-30) return { x: 0, y: 0 };
+  return { x: e.x / mag, y: e.y / mag };
+}
+
+// ============================================================
+//  Field Line Tracing (RK4)
+// ============================================================
+function traceFieldLine(startX, startY, direction, sourceCharge) {
+  const pts = [{ x: startX, y: startY }];
+  let px = startX, py = startY;
+  const dt = FIELD_LINE_DT * direction;
+  const isPosSrc = sourceCharge.q > 0;
+
+  for (let step = 0; step < MAX_STEPS; step++) {
+    let hit = false;
+    for (const c of state.charges) {
+      if (c === sourceCharge) continue;
+      const dx = px - c.x, dy = py - c.y;
+      const dist2 = dx * dx + dy * dy;
+      const isTarget = isPosSrc ? (c.q < 0) : (c.q > 0);
+      if (isTarget && dist2 < CHARGE_RADIUS * CHARGE_RADIUS) { hit = true; break; }
+    }
+    if (hit) break;
+    if (Math.abs(px) > MAX_TRACE_R || Math.abs(py) > MAX_TRACE_R) break;
+
+    const k1 = fieldDir(px, py);
+    const k2 = fieldDir(px + 0.5 * dt * k1.x, py + 0.5 * dt * k1.y);
+    const k3 = fieldDir(px + 0.5 * dt * k2.x, py + 0.5 * dt * k2.y);
+    const k4 = fieldDir(px + dt * k3.x, py + dt * k3.y);
+
+    px += dt * (k1.x + 2 * k2.x + 2 * k3.x + k4.x) / 6;
+    py += dt * (k1.y + 2 * k2.y + 2 * k3.y + k4.y) / 6;
+    pts.push({ x: px, y: py });
+  }
+  return pts;
+}
+
+function getFieldLineStarts(charge, numLines) {
+  const pts = [];
+  const r = CHARGE_RADIUS + 0.08;
+  for (let i = 0; i < numLines; i++) {
+    const a = (2 * Math.PI * i) / numLines;
+    pts.push({ x: charge.x + r * Math.cos(a), y: charge.y + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+function generateFieldLines() {
+  cachedFieldLines = [];
+  if (state.charges.length === 0) return;
+
+  const nCharges = state.charges.length;
+  for (const charge of state.charges) {
+    const qnC = Math.abs(charge.q) / 1e-9;
+    let numLines = Math.round(qnC * LINES_PER_NC);
+    numLines = Math.max(MIN_LINES, Math.min(MAX_LINES_PER_CHARGE, numLines));
+    numLines = Math.min(numLines, Math.floor(TOTAL_MAX_LINES / nCharges));
+    if (numLines < 4) numLines = 4;
+
+    const isPos = charge.q > 0;
+    const starts = getFieldLineStarts(charge, numLines);
+    for (const s of starts) {
+      const dir = isPos ? 1 : -1;
+      const pts = traceFieldLine(s.x, s.y, dir, charge);
+      if (pts.length < 3) continue;
+      cachedFieldLines.push({ points: pts, isPos, charge });
+    }
+  }
+}
+
+// ============================================================
+//  Equipotential Lines (Marching Squares)
+// ============================================================
+const MS_TABLE = [
+  [],        [[3,0]],   [[0,1]],   [[3,1]],
+  [[1,2]],  null,       [[0,2]],   [[3,2]],
+  [[2,3]],  [[2,0]],   null,       [[1,2]],
+  [[1,3]],  [[0,1]],   [[0,3]],   [],
+];
+
+function msLerp(va, vb, xa, ya, xb, yb, level) {
+  if (Math.abs(vb - va) < 1e-30) return { x: (xa + xb) / 2, y: (ya + yb) / 2 };
+  const t = (level - va) / (vb - va);
+  return { x: xa + t * (xb - xa), y: ya + t * (yb - ya) };
+}
+
+function marchingSquares(level, xMin, xMax, yMin, yMax, step, grid, nx, ny) {
+  const segments = [];
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const x0 = xMin + ix * step, x1 = x0 + step;
+      const y0 = yMin + iy * step, y1 = y0 + step;
+      const v00 = grid[iy * (nx + 1) + ix];
+      const v10 = grid[iy * (nx + 1) + ix + 1];
+      const v01 = grid[(iy + 1) * (nx + 1) + ix];
+      const v11 = grid[(iy + 1) * (nx + 1) + ix + 1];
+
+      let idx = 0;
+      if (v00 > level) idx |= 1;
+      if (v10 > level) idx |= 2;
+      if (v11 > level) idx |= 4;
+      if (v01 > level) idx |= 8;
+      if (idx === 0 || idx === 15) continue;
+
+      const edges = [
+        msLerp(v00, v10, x0, y0, x1, y0, level),
+        msLerp(v10, v11, x1, y0, x1, y1, level),
+        msLerp(v01, v11, x0, y1, x1, y1, level),
+        msLerp(v00, v01, x0, y0, x0, y1, level),
+      ];
+
+      let segs = MS_TABLE[idx];
+      if (segs === null) {
+        const center = (v00 + v10 + v01 + v11) / 4;
+        if (idx === 5) {
+          segs = center > level ? [[0,1],[2,3]] : [[0,3],[1,2]];
+        } else {
+          segs = center > level ? [[0,3],[1,2]] : [[0,1],[2,3]];
+        }
+      }
+      for (const [a, b] of segs) {
+        segments.push({ x1: edges[a].x, y1: edges[a].y, x2: edges[b].x, y2: edges[b].y });
+      }
+    }
+  }
+  return segments;
+}
+
+function computeEquipotLevels(count) {
+  const bounds = getVisibleBounds();
+  const pad = 2;
+  const xMin = bounds.xMin - pad, xMax = bounds.xMax + pad;
+  const yMin = bounds.yMin - pad, yMax = bounds.yMax + pad;
+  const sampleStep = Math.max(0.5, (xMax - xMin) / 30);
+  let vMin = Infinity, vMax = -Infinity;
+  for (let y = yMin; y <= yMax; y += sampleStep) {
+    for (let x = xMin; x <= xMax; x += sampleStep) {
+      const v = potentialAt(x, y);
+      if (isFinite(v)) { vMin = Math.min(vMin, v); vMax = Math.max(vMax, v); }
+    }
+  }
+  if (!isFinite(vMin) || vMax <= vMin) return [];
+  if (viewMode === '3d' && surface3dCache) {
+    const midCap = surface3dCache.potCap * 0.82;
+    vMin = Math.max(vMin, -midCap);
+    vMax = Math.min(vMax, midCap);
+  }
+  const span = vMax - vMin;
+  const lo = vMin + span * 0.08;
+  const hi = vMax - span * 0.08;
+  if (hi <= lo) return [];
+  const levels = [];
+  for (let i = 0; i < count; i++) levels.push(lo + (hi - lo) * i / (count - 1));
+  return levels;
+}
+
+function equipotColor(t) {
+  const stops = [
+    [0.0, [0,85,255]], [0.2, [0,204,255]], [0.4, [0,238,170]],
+    [0.6, [170,255,0]], [0.8, [255,204,0]], [1.0, [255,34,0]],
+  ];
+  let i = 0;
+  while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+  const [t0, c0] = stops[i], [t1, c1] = stops[i + 1];
+  const f = Math.max(0, Math.min(1, (t - t0) / (t1 - t0)));
+  return [
+    Math.round(c0[0] + (c1[0] - c0[0]) * f),
+    Math.round(c0[1] + (c1[1] - c0[1]) * f),
+    Math.round(c0[2] + (c1[2] - c0[2]) * f),
+  ];
+}
+
+function generateEquipotLines() {
+  cachedEquipLines = [];
+  if (state.charges.length === 0) return;
+
+  const count = parseInt(document.getElementById('eq-count')?.value || '8');
+  const levels = computeEquipotLevels(count);
+  if (levels.length === 0) return;
+
+  let xMin, xMax, yMin, yMax;
+  if (viewMode === '3d') {
+    const r = surface3dCache ? surface3dCache.range : 13;
+    xMin = -r; xMax = r; yMin = -r; yMax = r;
+  } else {
+    const bounds = getVisibleBounds();
+    const pad = 3;
+    xMin = bounds.xMin - pad; xMax = bounds.xMax + pad;
+    yMin = bounds.yMin - pad; yMax = bounds.yMax + pad;
+  }
+  const step = Math.max(0.15, (xMax - xMin) / 120);
+  const nx = Math.ceil((xMax - xMin) / step);
+  const ny = Math.ceil((yMax - yMin) / step);
+
+  const grid = new Float64Array((nx + 1) * (ny + 1));
+  for (let iy = 0; iy <= ny; iy++) {
+    for (let ix = 0; ix <= nx; ix++) {
+      grid[iy * (nx + 1) + ix] = potentialAt(xMin + ix * step, yMin + iy * step);
+    }
+  }
+
+  for (let li = 0; li < levels.length; li++) {
+    const t = li / Math.max(levels.length - 1, 1);
+    const color = equipotColor(t);
+    const segments = marchingSquares(levels[li], xMin, xMax, yMin, yMax, step, grid, nx, ny);
+    cachedEquipLines.push({ segments, color, level: levels[li] });
+  }
+}
+
+// ============================================================
+//  Heatmap
+// ============================================================
+let hmCanvas = null;
+function generateHeatmap() {
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  const res = 4;
+  const w = Math.ceil(cw / res), h = Math.ceil(ch / res);
+  if (!hmCanvas) hmCanvas = document.createElement('canvas');
+  hmCanvas.width = w; hmCanvas.height = h;
+  const hmCtx = hmCanvas.getContext('2d');
+  const imgData = hmCtx.createImageData(w, h);
+  const d = imgData.data;
+
+  let maxLog = 0;
+  const mags = new Float32Array(w * h);
+  for (let py = 0; py < h; py++) {
+    for (let px = 0; px < w; px++) {
+      const [wx, wy] = canvasToWorld(px * res, py * res);
+      const m = fieldMagnitude(wx, wy);
+      const lm = Math.log10(m + 1);
+      mags[py * w + px] = lm;
+      if (lm > maxLog) maxLog = lm;
+    }
+  }
+  if (maxLog < 0.01) maxLog = 1;
+
+  for (let i = 0; i < mags.length; i++) {
+    const t = Math.min(1, mags[i] / (maxLog * 0.7));
+    const idx = i * 4;
+    if (t < 0.25) {
+      const f = t / 0.25;
+      d[idx] = 0; d[idx+1] = Math.round(f * 40); d[idx+2] = Math.round(20 + f * 80);
+    } else if (t < 0.5) {
+      const f = (t - 0.25) / 0.25;
+      d[idx] = 0; d[idx+1] = Math.round(40 + f * 140); d[idx+2] = Math.round(100 + f * 55);
+    } else if (t < 0.75) {
+      const f = (t - 0.5) / 0.25;
+      d[idx] = Math.round(f * 255); d[idx+1] = Math.round(180 + f * 75); d[idx+2] = Math.round(155 - f * 155);
+    } else {
+      const f = (t - 0.75) / 0.25;
+      d[idx] = 255; d[idx+1] = Math.round(255 - f * 120); d[idx+2] = Math.round(f * 60);
+    }
+    d[idx + 3] = Math.round(40 + t * 100);
+  }
+  hmCtx.putImageData(imgData, 0, 0);
+  heatmapImage = hmCanvas;
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function render() {
+  if (viewMode === '3d') { renderGL(); return; }
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#080d1a';
+  ctx.fillRect(0, 0, cw, ch);
+
+  if (state.show.heatmap && heatmapImage) {
+    ctx.drawImage(heatmapImage, 0, 0, cw, ch);
+  }
+  if (state.show.grid) renderGrid(cw, ch);
+  if (state.show.equipotential) renderEquipot(cw, ch);
+  if (state.show.fieldLines) renderFieldLines();
+  renderPlates();
+  renderChartPath();
+  renderCharges();
+  if (state.show.labels) renderLabels();
+  renderProbes();
+  ctx.restore();
+}
+
+function renderGrid(cw, ch) {
+  const { xMin, xMax, yMin, yMax } = getVisibleBounds();
+  const range = (xMax - xMin);
+  let step = 1;
+  if (range > 60) step = 5;
+  else if (range > 30) step = 2;
+  else if (range < 8) step = 0.5;
+
+  ctx.strokeStyle = 'rgba(25,50,100,0.35)';
+  ctx.lineWidth = 0.5;
+  for (let x = Math.floor(xMin / step) * step; x <= xMax; x += step) {
+    const [cx] = worldToCanvas(x, 0);
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, ch); ctx.stroke();
+  }
+  for (let y = Math.floor(yMin / step) * step; y <= yMax; y += step) {
+    const [, cy] = worldToCanvas(0, y);
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(cw, cy); ctx.stroke();
+  }
+
+  ctx.strokeStyle = 'rgba(80,130,220,0.45)';
+  ctx.lineWidth = 1.2;
+  const [ox, oy] = worldToCanvas(0, 0);
+  ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(cw, oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, ch); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(100,160,255,0.5)';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center';
+  for (let x = Math.ceil(xMin / step) * step; x <= xMax; x += step) {
+    if (Math.abs(x) < 0.01) continue;
+    const [cx] = worldToCanvas(x, 0);
+    ctx.fillText(fmtNum(x), cx, oy + 12);
+  }
+  ctx.textAlign = 'right';
+  for (let y = Math.ceil(yMin / step) * step; y <= yMax; y += step) {
+    if (Math.abs(y) < 0.01) continue;
+    const [, cy] = worldToCanvas(0, y);
+    ctx.fillText(fmtNum(y), ox - 4, cy + 3);
+  }
+  ctx.fillStyle = 'rgba(100,160,255,0.35)';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('x', cw - 14, oy - 6);
+  ctx.fillText('y', ox + 6, 14);
+}
+
+function fmtNum(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(1); }
+
+function renderFieldLines() {
+  for (const line of cachedFieldLines) {
+    if (line.points.length < 2) continue;
+    const color = line.isPos ? 'rgba(255,80,60,' : 'rgba(50,140,255,';
+    ctx.beginPath();
+    const [cx0, cy0] = worldToCanvas(line.points[0].x, line.points[0].y);
+    ctx.moveTo(cx0, cy0);
+    for (let i = 1; i < line.points.length; i++) {
+      const [cx, cy] = worldToCanvas(line.points[i].x, line.points[i].y);
+      ctx.lineTo(cx, cy);
+    }
+    ctx.strokeStyle = color + '0.7)';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    const midIdx = Math.floor(line.points.length * 0.55);
+    if (midIdx > 0 && midIdx < line.points.length) {
+      const p0 = line.points[midIdx - 1], p1 = line.points[midIdx];
+      const [ax0, ay0] = worldToCanvas(p0.x, p0.y);
+      const [ax1, ay1] = worldToCanvas(p1.x, p1.y);
+      let angle = Math.atan2(ay1 - ay0, ax1 - ax0);
+      if (!line.isPos) angle += Math.PI;
+      ctx.fillStyle = color + '0.85)';
+      drawArrowhead(ax1, ay1, angle, 5);
+    }
+  }
+}
+
+function drawArrowhead(x, y, angle, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.7, size * 0.45);
+  ctx.lineTo(-size * 0.35, 0);
+  ctx.lineTo(-size * 0.7, -size * 0.45);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderEquipot() {
+  const opacity = parseFloat(document.getElementById('eq-opacity')?.value || '0.7');
+  const showLabels = document.getElementById('eq-labels')?.checked;
+  for (const eq of cachedEquipLines) {
+    const [r, g, b] = eq.color;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${opacity})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (const s of eq.segments) {
+      const [x1, y1] = worldToCanvas(s.x1, s.y1);
+      const [x2, y2] = worldToCanvas(s.x2, s.y2);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
+
+    if (showLabels && eq.segments.length > 0) {
+      const midSeg = eq.segments[Math.floor(eq.segments.length / 2)];
+      const [lx, ly] = worldToCanvas((midSeg.x1 + midSeg.x2) / 2, (midSeg.y1 + midSeg.y2) / 2);
+      const label = formatPotential(eq.level);
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(opacity + 0.2, 1)})`;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, lx, ly - 4);
+    }
+  }
+}
+
+function formatPotential(v) {
+  const av = Math.abs(v);
+  if (av >= 1e6) return (v / 1e6).toFixed(1) + 'MV';
+  if (av >= 1e3) return (v / 1e3).toFixed(1) + 'kV';
+  if (av >= 1) return v.toFixed(1) + 'V';
+  if (av >= 1e-3) return (v * 1e3).toFixed(1) + 'mV';
+  return v.toExponential(1) + 'V';
+}
+
+function formatField(e) {
+  if (e >= 1e9) return (e / 1e9).toFixed(2) + ' GN/C';
+  if (e >= 1e6) return (e / 1e6).toFixed(2) + ' MN/C';
+  if (e >= 1e3) return (e / 1e3).toFixed(2) + ' kN/C';
+  if (e >= 1) return e.toFixed(2) + ' N/C';
+  return (e * 1e3).toFixed(2) + ' mN/C';
+}
+
+function renderCharges() {
+  for (const c of state.charges) {
+    const [cx, cy] = worldToCanvas(c.x, c.y);
+    const r = CHARGE_RADIUS * view.scale;
+    const isPos = c.q > 0;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.5);
+    if (isPos) {
+      grad.addColorStop(0, 'rgba(255,100,80,0.25)');
+      grad.addColorStop(1, 'rgba(255,100,80,0)');
+    } else {
+      grad.addColorStop(0, 'rgba(50,140,255,0.25)');
+      grad.addColorStop(1, 'rgba(50,140,255,0)');
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2); ctx.fill();
+
+    const cGrad = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, 0, cx, cy, r);
+    if (isPos) {
+      cGrad.addColorStop(0, '#ff7766');
+      cGrad.addColorStop(1, '#cc3322');
+    } else {
+      cGrad.addColorStop(0, '#66aaff');
+      cGrad.addColorStop(1, '#1a5a9e');
+    }
+    ctx.fillStyle = cGrad;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.strokeStyle = isPos ? 'rgba(255,200,180,0.4)' : 'rgba(150,200,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(10, r * 0.9)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isPos ? '+' : '−', cx, cy);
+  }
+}
+
+function renderLabels() {
+  for (const c of state.charges) {
+    const [cx, cy] = worldToCanvas(c.x, c.y);
+    const r = CHARGE_RADIUS * view.scale;
+    const qnC = (c.q * 1e9).toFixed(1);
+    const label = (c.q > 0 ? '+' : '') + qnC + 'nC';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = c.q > 0 ? 'rgba(255,150,130,0.9)' : 'rgba(130,180,255,0.9)';
+    ctx.fillText(label, cx, cy - r - 6);
+  }
+}
+
+function renderPlates() {
+  for (const plate of (state.plates || [])) {
+    const [x1, y1] = worldToCanvas(plate.x1, plate.y1);
+    const [x2, y2] = worldToCanvas(plate.x2, plate.y2);
+    ctx.strokeStyle = plate.color;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+}
+
+function renderProbes() {
+  for (const p of state.probes) {
+    const [cx, cy] = worldToCanvas(p.x, p.y);
+    const e = fieldAt(p.x, p.y);
+    const mag = Math.sqrt(e.x * e.x + e.y * e.y);
+
+    ctx.fillStyle = 'rgba(0,255,136,0.15)';
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,255,136,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+
+    if (mag > 1e-20) {
+      const dir = { x: e.x / mag, y: e.y / mag };
+      const arrowLen = Math.min(40, Math.max(15, Math.log10(mag + 1) * 6));
+      const [ax, ay] = [cx + dir.x * arrowLen, cy - dir.y * arrowLen];
+      ctx.strokeStyle = 'rgba(0,255,136,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ax, ay); ctx.stroke();
+      const angle = Math.atan2(ay - cy, ax - cx);
+      ctx.fillStyle = 'rgba(0,255,136,0.9)';
+      drawArrowhead(ax, ay, angle, 5);
+    }
+
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#00ff88';
+    ctx.textAlign = 'left';
+    ctx.fillText('E=' + formatField(mag), cx + 14, cy - 4);
+    ctx.fillStyle = 'rgba(0,255,136,0.6)';
+    ctx.fillText('φ=' + formatPotential(potentialAt(p.x, p.y)), cx + 14, cy + 8);
+  }
+}
+
+function renderChartPath() {
+  const panel = document.getElementById('chart-panel');
+  if (!panel || !panel.classList.contains('visible')) return;
+  const path = getChartPath();
+  if (!path) return;
+  const [x1, y1] = worldToCanvas(path.sx, path.sy);
+  const [x2, y2] = worldToCanvas(path.ex, path.ey);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,200,60,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#ffcc44';
+  ctx.beginPath(); ctx.arc(x1, y1, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x2, y2, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.font = '10px sans-serif';
+  ctx.fillText('A', x1 - 8, y1 - 6);
+  ctx.fillText('B', x2 + 5, y2 - 6);
+
+  if (chartPickState && chartPickState.stage === 'end') {
+    const [px, py] = worldToCanvas(chartPickState.start.x, chartPickState.start.y);
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillText('起', px + 6, py - 4);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Update Pipeline
+// ============================================================
+function requestRender() { needsRender = true; }
+function requestPhysicsUpdate() { needsPhysics = true; needsRender = true; }
+
+function physicsUpdate() {
+  if (viewMode === '3d') {
+    buildSurface3D();
+    generateFieldLines();
+    generateEquipotLines();
+    rebuildAllGL();
+  } else {
+    generateFieldLines();
+    if (state.show.equipotential) generateEquipotLines();
+    if (state.show.heatmap) generateHeatmap();
+  }
+}
+
+function animLoop() {
+  requestAnimationFrame(animLoop);
+  if (needsPhysics) {
+    physicsUpdate();
+    needsPhysics = false;
+  }
+  if (viewMode === '3d' && glControls) {
+    if (glControls.update()) needsRender = true;
+  }
+  if (needsRender) {
+    render();
+    needsRender = false;
+  }
+}
+
+// ============================================================
+//  Mouse Interaction
+// ============================================================
+function setupEvents() {
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('resize', onResize);
+}
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function onMouseMove(e) {
+  if (viewMode === '3d') return;
+  mouseCanvas = getMousePos(e);
+  const [wx, wy] = canvasToWorld(mouseCanvas.x, mouseCanvas.y);
+  mouseWorld = { x: wx, y: wy };
+  updateInfoBar(wx, wy);
+
+  if (state.isDragging && state.selectedCharge) {
+    const c = state.selectedCharge;
+    c.x = wx + dragOffset.x;
+    c.y = wy + dragOffset.y;
+    requestPhysicsUpdate();
+    updateChargeList();
+    return;
+  }
+
+  if (state.isPanning && panStart) {
+    const dx = (mouseCanvas.x - panStart.cx) / view.scale;
+    const dy = -(mouseCanvas.y - panStart.cy) / view.scale;
+    view.centerX = panStart.vx - dx;
+    view.centerY = panStart.vy - dy;
+    requestPhysicsUpdate();
+    return;
+  }
+
+  let hovering = false;
+  for (const c of state.charges) {
+    const [cx, cy] = worldToCanvas(c.x, c.y);
+    const dx = mouseCanvas.x - cx, dy = mouseCanvas.y - cy;
+    if (dx * dx + dy * dy < (CHARGE_RADIUS * view.scale + 4) ** 2) {
+      canvas.style.cursor = 'grab';
+      showTooltip(c, e);
+      hovering = true;
+      break;
+    }
+  }
+  if (!hovering) {
+    canvas.style.cursor = chartPickState ? 'crosshair' : state.probeMode ? 'crosshair' : 'default';
+    hideTooltip();
+  }
+}
+
+function onMouseDown(e) {
+  if (viewMode === '3d') return;
+  mouseCanvas = getMousePos(e);
+  const [wx, wy] = canvasToWorld(mouseCanvas.x, mouseCanvas.y);
+
+  if (e.button === 2 || e.button === 1) {
+    state.isPanning = true;
+    panStart = { cx: mouseCanvas.x, cy: mouseCanvas.y, vx: view.centerX, vy: view.centerY };
+    canvas.style.cursor = 'move';
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  if (chartPickState && handleChartPick(wx, wy)) return;
+
+  if (state.probeMode) {
+    addProbe(wx, wy);
+    return;
+  }
+
+  for (const c of state.charges) {
+    const dx = wx - c.x, dy = wy - c.y;
+    if (dx * dx + dy * dy < (CHARGE_RADIUS + 0.3) ** 2) {
+      state.selectedCharge = c;
+      state.isDragging = true;
+      dragOffset = { x: c.x - wx, y: c.y - wy };
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+  }
+  state.selectedCharge = null;
+}
+
+function onMouseUp(e) {
+  if (viewMode === '3d') return;
+  if (state.isDragging) {
+    state.isDragging = false;
+    canvas.style.cursor = 'default';
+    requestPhysicsUpdate();
+    updateChartIfVisible();
+  }
+  if (state.isPanning) {
+    state.isPanning = false;
+    canvas.style.cursor = 'default';
+  }
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  if (viewMode === '3d') return;
+  const [wx, wy] = canvasToWorld(mouseCanvas.x, mouseCanvas.y);
+  const factor = e.deltaY > 0 ? 0.88 : 1.136;
+  const newScale = Math.max(5, Math.min(200, view.scale * factor));
+  view.centerX = wx - (wx - view.centerX) * (newScale / view.scale);
+  view.centerY = wy - (wy - view.centerY) * (newScale / view.scale);
+  view.scale = newScale;
+  requestPhysicsUpdate();
+}
+
+function onKeyDown(e) {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedCharge) {
+    removeCharge(state.selectedCharge.id);
+    state.selectedCharge = null;
+  }
+  if (e.key === 'Escape') {
+    state.selectedCharge = null;
+    if (state.probeMode) { document.getElementById('tog-probe').checked = false; toggleProbeMode(false); }
+  }
+}
+
+function onResize() {
+  setupCanvas();
+  resizeGL();
+  requestPhysicsUpdate();
+}
+
+// ============================================================
+//  UI Helpers
+// ============================================================
+function updateInfoBar(wx, wy) {
+  document.getElementById('info-pos').textContent = `(${wx.toFixed(1)}, ${wy.toFixed(1)})`;
+  if (state.charges.length > 0) {
+    const e = fieldMagnitude(wx, wy);
+    const phi = potentialAt(wx, wy);
+    document.getElementById('info-E').textContent = formatField(e);
+    document.getElementById('info-phi').textContent = formatPotential(phi);
+  } else {
+    document.getElementById('info-E').textContent = '—';
+    document.getElementById('info-phi').textContent = '—';
+  }
+}
+
+function showTooltip(charge, e) {
+  const tip = document.getElementById('tooltip');
+  const sign = charge.q > 0 ? '正电荷' : '负电荷';
+  const qnC = (charge.q * 1e9).toFixed(1);
+  document.getElementById('tip-title').textContent = `${sign} #${charge.id}`;
+  document.getElementById('tip-content').innerHTML =
+    `电量: <span class="tip-val">${charge.q > 0 ? '+' : ''}${qnC} nC</span><br>` +
+    `位置: <span class="tip-val">(${charge.x.toFixed(1)}, ${charge.y.toFixed(1)})</span>`;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 15) + 'px';
+  tip.style.top = (e.clientY - 10) + 'px';
+}
+
+function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function setHint(text) {
+  document.getElementById('hint-text').innerHTML = '<strong>提示：</strong>' + text;
+}
+
+// ============================================================
+//  Charge Management
+// ============================================================
+function addCharge(sign, x, y) {
+  const id = ++state.chargeIdCounter;
+  if (x === undefined) {
+    x = view.centerX + (Math.random() - 0.5) * 6;
+    y = view.centerY + (Math.random() - 0.5) * 6;
+  }
+  state.charges.push({ id, q: sign * 5e-9, x, y });
+  requestPhysicsUpdate();
+  updateChargeList();
+  updateChartIfVisible();
+}
+
+function removeCharge(id) {
+  state.charges = state.charges.filter(c => c.id !== id);
+  requestPhysicsUpdate();
+  updateChargeList();
+  updateChartIfVisible();
+}
+
+function updateChargeQ(id, newQ) {
+  const c = state.charges.find(c => c.id === id);
+  if (c) { c.q = newQ; requestPhysicsUpdate(); updateChartIfVisible(); }
+}
+
+function updateChargeList() {
+  const list = document.getElementById('charge-list');
+  if (state.charges.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:rgba(150,180,255,0.4);text-align:center;padding:8px 0;">暂无电荷，请添加</div>';
+    return;
+  }
+  list.innerHTML = state.charges.map(c => {
+    const isPos = c.q > 0;
+    const qnC = (c.q * 1e9).toFixed(1);
+    const qAbs = Math.abs(c.q * 1e9);
+    return `<div class="charge-item">
+      <div class="charge-item-header">
+        <div class="charge-badge ${isPos?'pos':'neg'}">${isPos?'+':'−'}</div>
+        <span class="charge-name">${isPos?'正电荷':'负电荷'} #${c.id}</span>
+        <span class="charge-coords">(${c.x.toFixed(1)}, ${c.y.toFixed(1)})</span>
+        <button class="btn-del" onclick="removeCharge(${c.id})" title="删除">✕</button>
+      </div>
+      <div class="charge-slider-row">
+        <span class="charge-slider-label">电量</span>
+        <input type="range" class="charge-slider" min="1" max="10" step="0.5" value="${qAbs}"
+          oninput="updateChargeQ(${c.id}, ${isPos?1:-1} * this.value * 1e-9); this.nextElementSibling.textContent = '${isPos?'+':'−'}' + parseFloat(this.value).toFixed(1) + 'nC'">
+        <span class="charge-slider-val">${isPos?'+':''}${qnC}nC</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+//  Presets
+// ============================================================
+function clearAll() {
+  state.charges = [];
+  state.probes = [];
+  state.plates = [];
+  state.selectedCharge = null;
+  requestPhysicsUpdate();
+  updateChargeList();
+  clearProbes();
+  setHint('滚轮缩放 · 右键平移 · 左键拖拽电荷');
+}
+
+function loadPreset(name) {
+  clearAll();
+  currentPreset = name;
+  const defs = {
+    single_pos: () => {
+      addCharge(1, 0, 0);
+      setHint('单正电荷：电场线从正电荷向四周辐射，等势线为同心圆');
+    },
+    single_neg: () => {
+      addCharge(-1, 0, 0);
+      setHint('单负电荷：电场线从四周汇入负电荷');
+    },
+    dipole: () => {
+      addCharge(1, -3, 0);
+      addCharge(-1, 3, 0);
+      setHint('等量异号电荷：电场线从正电荷出发终止于负电荷，中间等势线密集');
+    },
+    same_sign: () => {
+      addCharge(1, -3, 0);
+      addCharge(1, 3, 0);
+      setHint('等量同号电荷：两电荷间存在零场点，电场线互相排斥');
+    },
+    capacitor: () => {
+      state.plates = [
+        { x1: -4, y1: 2.5, x2: 4, y2: 2.5, color: 'rgba(255,100,80,0.5)' },
+        { x1: -4, y1: -2.5, x2: 4, y2: -2.5, color: 'rgba(80,150,255,0.5)' },
+      ];
+      for (let i = 0; i < 9; i++) { addCharge(1, -4 + i, 2.5); }
+      for (let i = 0; i < 9; i++) { addCharge(-1, -4 + i, -2.5); }
+      setHint('平行板电容器：板间电场近似匀强，边缘有散逸效应');
+    },
+    quadrupole: () => {
+      addCharge(1, -3, 3);
+      addCharge(-1, 3, 3);
+      addCharge(-1, -3, -3);
+      addCharge(1, 3, -3);
+      setHint('四极子：观察复杂电场的对称性分布');
+    },
+  };
+  if (defs[name]) {
+    defs[name]();
+    view.centerX = 0; view.centerY = 0;
+    view.scale = name === 'capacitor' ? 35 : 40;
+    requestPhysicsUpdate();
+    updateChartIfVisible();
+  }
+}
+
+// ============================================================
+//  Display Option Toggles
+// ============================================================
+function toggleOption(key, val) {
+  state.show[key] = val;
+  if (key === 'equipotential') {
+    const sub = document.getElementById('equip-sub');
+    sub.classList.toggle('visible', val);
+  }
+  requestPhysicsUpdate();
+}
+
+function resetView() {
+  view.centerX = 0; view.centerY = 0; view.scale = 40;
+  requestPhysicsUpdate();
+}
+
+function exportImage() {
+  const link = document.createElement('a');
+  link.download = '电场可视化.png';
+  if (viewMode === '3d' && glRenderer) {
+    glRenderer.render(glScene, cam3d.ortho ? glOrthoCam : glPerspCam);
+    link.href = glCanvas.toDataURL('image/png');
+  } else {
+    link.href = canvas.toDataURL('image/png');
+  }
+  link.click();
+}
+
+// ============================================================
+//  Probe Mode
+// ============================================================
+function toggleProbeMode(on) {
+  state.probeMode = on;
+  canvas.style.cursor = on ? 'crosshair' : 'default';
+  if (on) setHint('探测模式：点击场景放置探头，显示该点场强和电势');
+  else setHint('滚轮缩放 · 右键平移 · 左键拖拽电荷');
+}
+
+function addProbe(x, y) {
+  const id = ++state.probeIdCounter;
+  state.probes.push({ id, x, y });
+  requestRender();
+  updateProbeList();
+}
+
+function removeProbe(id) {
+  state.probes = state.probes.filter(p => p.id !== id);
+  requestRender();
+  updateProbeList();
+}
+
+function clearProbes() {
+  state.probes = [];
+  requestRender();
+  updateProbeList();
+}
+
+function updateProbeList() {
+  const el = document.getElementById('probe-list');
+  if (state.probes.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = state.probes.map(p => {
+    const e = fieldMagnitude(p.x, p.y);
+    const phi = potentialAt(p.x, p.y);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:rgba(0,255,136,0.05);border-radius:4px;margin-bottom:3px;font-size:10px;color:#a0c4ff;">
+      <span>#${p.id} (${p.x.toFixed(1)},${p.y.toFixed(1)})</span>
+      <span style="color:#00ff88;font-weight:bold;">${formatField(e)}</span>
+      <button onclick="removeProbe(${p.id})" style="background:none;border:none;color:#ff6666;cursor:pointer;font-size:11px;padding:0 3px;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+//  Chart Analysis Panel
+// ============================================================
+let chartView = 'both';
+let chartPickState = null; // null | {stage:'start'} | {stage:'end', start:{x,y}}
+let chartCustomPath = null; // {sx,sy,ex,ey} from pick or custom input
+
+function toggleChart() {
+  const panel = document.getElementById('chart-panel');
+  panel.classList.toggle('visible');
+  if (panel.classList.contains('visible')) updateChart();
+}
+
+function updateChartIfVisible() {
+  if (document.getElementById('chart-panel').classList.contains('visible')) updateChart();
+}
+
+function setChartView(v, btn) {
+  chartView = v;
+  document.querySelectorAll('.chart-vtab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  updateChart();
+}
+
+function onChartPathTypeChange() {
+  const mode = document.getElementById('chart-path-type').value;
+  document.getElementById('chart-custom-row').style.display = mode === 'custom' ? 'block' : 'none';
+  document.getElementById('chart-pick-row').style.display = mode === 'pick' ? 'block' : 'none';
+  if (mode === 'pick') {
+    chartPickState = { stage: 'start' };
+    document.getElementById('chart-pick-info').textContent = '等待点击起点...';
+  } else {
+    chartPickState = null;
+  }
+  if (mode !== 'pick') updateChart();
+}
+
+function handleChartPick(wx, wy) {
+  if (!chartPickState) return false;
+  if (chartPickState.stage === 'start') {
+    chartPickState = { stage: 'end', start: { x: wx, y: wy } };
+    document.getElementById('chart-pick-info').textContent =
+      `起点: (${wx.toFixed(1)}, ${wy.toFixed(1)})  — 请点击终点`;
+    requestRender();
+    return true;
+  } else if (chartPickState.stage === 'end') {
+    chartCustomPath = {
+      sx: chartPickState.start.x, sy: chartPickState.start.y,
+      ex: wx, ey: wy,
+    };
+    document.getElementById('chart-pick-info').textContent =
+      `起点: (${chartCustomPath.sx.toFixed(1)}, ${chartCustomPath.sy.toFixed(1)}) → 终点: (${wx.toFixed(1)}, ${wy.toFixed(1)})`;
+    chartPickState = null;
+    updateChart();
+    requestRender();
+    return true;
+  }
+  return false;
+}
+
+function getChartPath() {
+  const mode = document.getElementById('chart-path-type').value;
+  const range = parseFloat(document.getElementById('chart-range').value);
+
+  if (mode === 'x') return { sx: -range, sy: 0, ex: range, ey: 0, label: 'x' };
+  if (mode === 'y') return { sx: 0, sy: -range, ex: 0, ey: range, label: 'y' };
+
+  if (mode === 'connect' && state.charges.length >= 2) {
+    const c0 = state.charges[0], c1 = state.charges[1];
+    const dx = c1.x - c0.x, dy = c1.y - c0.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ext = Math.max(range, len * 1.5);
+    const mx = (c0.x + c1.x) / 2, my = (c0.y + c1.y) / 2;
+    const ux = dx / len, uy = dy / len;
+    return { sx: mx - ext * ux, sy: my - ext * uy, ex: mx + ext * ux, ey: my + ext * uy, label: 'd' };
+  }
+  if (mode === 'perp' && state.charges.length >= 2) {
+    const c0 = state.charges[0], c1 = state.charges[1];
+    const dx = c1.x - c0.x, dy = c1.y - c0.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const mx = (c0.x + c1.x) / 2, my = (c0.y + c1.y) / 2;
+    const nx = -dy / len, ny = dx / len;
+    return { sx: mx - range * nx, sy: my - range * ny, ex: mx + range * nx, ey: my + range * ny, label: 'd⊥' };
+  }
+  if (mode === 'custom') {
+    return {
+      sx: parseFloat(document.getElementById('cp-sx').value) || -10,
+      sy: parseFloat(document.getElementById('cp-sy').value) || 0,
+      ex: parseFloat(document.getElementById('cp-ex').value) || 10,
+      ey: parseFloat(document.getElementById('cp-ey').value) || 0,
+      label: 'd',
+    };
+  }
+  if (mode === 'pick' && chartCustomPath) {
+    return { ...chartCustomPath, label: 'd' };
+  }
+  return { sx: -range, sy: 0, ex: range, ey: 0, label: 'x' };
+}
+
+function updateChart() {
+  const cc = document.getElementById('chart-canvas');
+  const wrap = cc.parentElement;
+  const cdpr = window.devicePixelRatio || 1;
+  cc.width = wrap.clientWidth * cdpr;
+  cc.height = wrap.clientHeight * cdpr;
+  const c = cc.getContext('2d');
+  c.scale(cdpr, cdpr);
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  if (state.charges.length === 0) {
+    c.fillStyle = '#050a19'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(150,180,255,0.3)'; c.font = '13px sans-serif';
+    c.textAlign = 'center'; c.fillText('请先添加电荷', W / 2, H / 2);
+    return;
+  }
+
+  const path = getChartPath();
+  const n = 300;
+  const dx = path.ex - path.sx, dy = path.ey - path.sy;
+  const pathLen = Math.sqrt(dx * dx + dy * dy);
+
+  const dataE = [], dataPhi = [], dataD = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const px = path.sx + t * dx, py = path.sy + t * dy;
+    dataE.push(fieldMagnitude(px, py));
+    dataPhi.push(potentialAt(px, py));
+    dataD.push(-pathLen / 2 + t * pathLen);
+  }
+
+  c.fillStyle = '#050a19';
+  c.fillRect(0, 0, W, H);
+
+  if (chartView === 'both') {
+    const gap = 12;
+    const halfH = (H - gap) / 2;
+    drawSingleGraph(c, 0, 0, W, halfH, dataE, dataD, path.label,
+      '场强 E', '#ff8844', 'rgba(255,136,68,0.1)', false);
+    drawSingleGraph(c, 0, halfH + gap, W, halfH, dataPhi, dataD, path.label,
+      '电势 φ', '#44ccff', 'rgba(68,204,255,0.08)', true);
+    c.strokeStyle = 'rgba(80,130,255,0.15)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, halfH + gap / 2); c.lineTo(W, halfH + gap / 2); c.stroke();
+  } else if (chartView === 'E') {
+    drawSingleGraph(c, 0, 0, W, H, dataE, dataD, path.label,
+      '场强 E (N/C)', '#ff8844', 'rgba(255,136,68,0.12)', false);
+  } else {
+    drawSingleGraph(c, 0, 0, W, H, dataPhi, dataD, path.label,
+      '电势 φ (V)', '#44ccff', 'rgba(68,204,255,0.1)', true);
+  }
+}
+
+function drawSingleGraph(c, ox, oy, W, H, data, dataX, xLabel, title, color, fillColor, allowNeg) {
+  const m = { top: 24, right: 12, bottom: 24, left: 52 };
+  const pw = W - m.left - m.right, ph = H - m.top - m.bottom;
+  if (pw < 10 || ph < 10) return;
+
+  const finiteData = data.filter(v => isFinite(v));
+  if (finiteData.length === 0) return;
+  let dMax = Math.max(...finiteData);
+  let dMin = allowNeg ? Math.min(...finiteData) : 0;
+  if (!allowNeg) {
+    const sorted = finiteData.slice().sort((a, b) => a - b);
+    dMax = sorted[Math.floor(sorted.length * 0.95)] || dMax;
+    dMax = Math.max(dMax, 1e-10);
+    dMin = 0;
+  } else {
+    const span = dMax - dMin || 1;
+    dMin -= span * 0.05; dMax += span * 0.05;
+  }
+  const dRange = dMax - dMin || 1;
+
+  function mapX(i) { return ox + m.left + (i / data.length) * pw; }
+  function mapY(v) {
+    const clamped = Math.max(dMin, Math.min(dMax, v));
+    return oy + m.top + ph - ((clamped - dMin) / dRange) * ph;
+  }
+
+  c.strokeStyle = 'rgba(40,70,120,0.3)'; c.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = oy + m.top + (ph * i) / 4;
+    c.beginPath(); c.moveTo(ox + m.left, y); c.lineTo(ox + m.left + pw, y); c.stroke();
+  }
+  if (allowNeg && dMin < 0 && dMax > 0) {
+    const y0 = mapY(0);
+    c.strokeStyle = 'rgba(100,150,255,0.25)'; c.lineWidth = 0.8;
+    c.setLineDash([4, 3]);
+    c.beginPath(); c.moveTo(ox + m.left, y0); c.lineTo(ox + m.left + pw, y0); c.stroke();
+    c.setLineDash([]);
+  }
+
+  c.beginPath();
+  let started = false;
+  for (let i = 0; i < data.length; i++) {
+    if (!isFinite(data[i])) { started = false; continue; }
+    const x = mapX(i), y = mapY(data[i]);
+    if (!started) { c.moveTo(x, y); started = true; } else c.lineTo(x, y);
+  }
+  c.strokeStyle = color; c.lineWidth = 1.8; c.stroke();
+
+  c.save(); c.globalAlpha = 0.6;
+  c.beginPath();
+  started = false;
+  for (let i = 0; i < data.length; i++) {
+    if (!isFinite(data[i])) continue;
+    const x = mapX(i), y = mapY(data[i]);
+    if (!started) { c.moveTo(x, oy + m.top + ph); c.lineTo(x, y); started = true; } else c.lineTo(x, y);
+  }
+  c.lineTo(mapX(data.length - 1), oy + m.top + ph);
+  c.closePath();
+  c.fillStyle = fillColor; c.fill();
+  c.restore();
+
+  c.fillStyle = 'rgba(150,180,255,0.45)'; c.font = '9px monospace'; c.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const idx = Math.round((i / 4) * (data.length - 1));
+    c.fillText(dataX[idx].toFixed(1), mapX(idx), oy + H - 4);
+  }
+  c.fillText(xLabel + ' (m)', ox + m.left + pw / 2, oy + H - 14);
+
+  c.textAlign = 'right'; c.fillStyle = color; c.font = '8px monospace';
+  const topLabel = allowNeg ? formatAutoUnit(dMax) : formatAutoUnit(dMax);
+  const botLabel = allowNeg ? formatAutoUnit(dMin) : '0';
+  c.fillText(topLabel, ox + m.left - 3, oy + m.top + 4);
+  c.fillText(botLabel, ox + m.left - 3, oy + m.top + ph + 3);
+  if (allowNeg && dMin < 0 && dMax > 0) {
+    c.fillText('0', ox + m.left - 3, mapY(0) + 3);
+  }
+
+  c.fillStyle = color; c.font = 'bold 10px sans-serif'; c.textAlign = 'left';
+  c.fillText(title, ox + m.left + 4, oy + m.top - 8);
+}
+
+function formatAutoUnit(v) {
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toFixed(1) + 'G';
+  if (a >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k';
+  if (a >= 1) return v.toFixed(1);
+  if (a >= 1e-3) return (v * 1e3).toFixed(1) + 'm';
+  return v.toExponential(1);
+}
+
+(function initChartDrag() {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      const panel = document.getElementById('chart-panel');
+      const header = panel?.querySelector('.chart-header');
+      if (!header) return;
+      let dragging = false, sx, sy, ol, ot;
+      header.addEventListener('mousedown', e => {
+        if (e.target.classList.contains('chart-close-btn')) return;
+        dragging = true; sx = e.clientX; sy = e.clientY;
+        ol = panel.offsetLeft; ot = panel.offsetTop;
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        panel.style.left = (ol + e.clientX - sx) + 'px';
+        panel.style.top = (ot + e.clientY - sy) + 'px';
+      });
+      document.addEventListener('mouseup', () => { dragging = false; });
+    }, 300);
+  });
+})();
+
+// ============================================================
+//  3D Potential Surface View
+// ============================================================
+
+// --- Surface Generation (Uniform Grid, Linear Potential Height) ---
+function logCompress(v) {
+  return v >= 0 ? Math.log1p(v) : -Math.log1p(-v);
+}
+
+function buildUniformCoords(range, baseN) {
+  const out = [];
+  const step = (2 * range) / baseN;
+  for (let i = 0; i <= baseN; i++) out.push(-range + i * step);
+  return out;
+}
+
+function potentialToSurfaceZ(v, cache = surface3dCache) {
+  if (!cache) return 0;
+  const clipped = Math.max(-cache.potCap, Math.min(cache.potCap, v));
+  return clipped * cache.potScale;
+}
+
+function buildSurface3D() {
+  if (state.charges.length === 0) { surface3dCache = null; return; }
+  const t0 = performance.now();
+  const qp = getQualityParams();
+  const range = 13;
+  const xArr = buildUniformCoords(range, qp.baseN);
+  const yArr = buildUniformCoords(range, qp.baseN);
+  const nx = xArr.length, ny = yArr.length;
+
+  const pots = new Float64Array(ny * nx);
+  for (let iy = 0; iy < ny; iy++)
+    for (let ix = 0; ix < nx; ix++) {
+      const v = potentialAt(xArr[ix], yArr[iy]);
+      pots[iy * nx + ix] = v;
+    }
+
+  const absPot = [];
+  for (let i = 0; i < pots.length; i++) {
+    const a = Math.abs(pots[i]);
+    if (isFinite(a)) absPot.push(a);
+  }
+  absPot.sort((a, b) => a - b);
+  const p85 = absPot[Math.floor(absPot.length * 0.85)] || 1;
+  const potScale = (SURFACE_MAX_Z * surfaceZScaleFactor) / Math.max(p85, 1e-10);
+  const potCap = p85 * 2.5;
+  const zCap = SURFACE_MAX_Z * 2.5 * surfaceZScaleFactor;
+
+  const faces = [];
+  for (let iy = 0; iy < ny - 1; iy++) {
+    for (let ix = 0; ix < nx - 1; ix++) {
+      const i00 = iy * nx + ix, i10 = i00 + 1;
+      const i01 = (iy + 1) * nx + ix, i11 = i01 + 1;
+      const z00 = potentialToSurfaceZ(pots[i00], { potScale, potCap });
+      const z10 = potentialToSurfaceZ(pots[i10], { potScale, potCap });
+      const z01 = potentialToSurfaceZ(pots[i01], { potScale, potCap });
+      const z11 = potentialToSurfaceZ(pots[i11], { potScale, potCap });
+      faces.push({
+        v: [[xArr[ix],z00,yArr[iy]], [xArr[ix+1],z10,yArr[iy]],
+            [xArr[ix+1],z11,yArr[iy+1]], [xArr[ix],z01,yArr[iy+1]]],
+        pot: (pots[i00] + pots[i10] + pots[i01] + pots[i11]) / 4,
+        zAvg: (z00 + z10 + z01 + z11) / 4,
+      });
+    }
+  }
+  const buildMs = performance.now() - t0;
+  surface3dCache = { faces, potScale, potCap, zCap, range, buildMs, faceCount: faces.length, xArr, yArr, pots, nx, ny };
+
+  const infoEl = document.getElementById('quality-info');
+  if (infoEl) {
+    const ql = getEffectiveQuality();
+    const lbl = QUALITY_TABLE[ql].label;
+    infoEl.textContent = `${lbl} · ${faces.length} 面 · 均匀网格 ${nx}×${ny} · Z×${surfaceZScaleFactor.toFixed(2)} · ${buildMs.toFixed(0)}ms`;
+  }
+}
+
+// --- View Switching ---
+function switchView(mode) {
+  viewMode = mode;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  const camP = document.getElementById('cam-presets');
+  const glToolbar = document.getElementById('gl-toolbar');
+  if (mode === '3d') {
+    canvas.style.display = 'none';
+    glCanvas.style.display = 'block';
+    cam3d.target = [0, 0, 0];
+    if (camP) camP.style.display = 'flex';
+    if (glToolbar) glToolbar.style.display = 'flex';
+    syncOrbitFromCam();
+    resizeGL();
+    updateSurfaceAlpha(surfaceAlpha);
+    updateSurfaceZScale(surfaceZScaleFactor);
+  } else {
+    canvas.style.display = 'block';
+    glCanvas.style.display = 'none';
+    canvas.style.cursor = 'default';
+    if (camP) camP.style.display = 'none';
+    if (glToolbar) glToolbar.style.display = 'none';
+  }
+  needsPhysics = true;
+  needsRender = true;
+}
+
+function setCamPreset(preset) {
+  cam3d.target = [0, 0, 0];
+  if (preset === 'free') {
+    cam3d.az = -0.54; cam3d.el = 0.58; cam3d.dist = 25; cam3d.ortho = false;
+  } else if (preset === 'xoy') {
+    cam3d.az = 0; cam3d.el = Math.PI / 2 - 0.001; cam3d.dist = 24; cam3d.ortho = true;
+  } else if (preset === 'xoz') {
+    cam3d.az = 0; cam3d.el = 0.001; cam3d.dist = 28; cam3d.ortho = true;
+  } else if (preset === 'yoz') {
+    cam3d.az = Math.PI / 2; cam3d.el = 0.001; cam3d.dist = 28; cam3d.ortho = true;
+  }
+  document.querySelectorAll('.cam-btn').forEach(b => b.classList.toggle('active', b.id === 'cam-' + preset));
+  syncOrbitFromCam();
+  needsRender = true;
+}
+
+// ============================================================
+//  Three.js WebGL 3D Renderer
+// ============================================================
+let glCanvas, glRenderer, glScene, glPerspCam, glOrthoCam, glControls;
+let glSurfaceMesh, glSurfaceMat, glSurfaceWire;
+let glFieldLineGroup, glContourGroup, glChargeGroup, glAxesGroup;
+let glActive = false;
+
+function initThreeJS() {
+  glCanvas = document.getElementById('gl-canvas');
+  glRenderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  glRenderer.setPixelRatio(window.devicePixelRatio);
+  const w = glCanvas.clientWidth, h = glCanvas.clientHeight;
+  glRenderer.setSize(w, h, false);
+  glRenderer.setClearColor(0x080d1a, 1);
+  glRenderer.sortObjects = true;
+
+  glScene = new THREE.Scene();
+
+  glPerspCam = new THREE.PerspectiveCamera(cam3d.fov, w / h, 0.1, 500);
+  const halfH = cam3d.dist * 0.42, halfW = halfH * (w / h);
+  glOrthoCam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.01, 500);
+
+  glCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  glControls = new OrbitControls(glPerspCam, glCanvas);
+  glControls.enableDamping = true;
+  glControls.dampingFactor = 0.12;
+  glControls.minDistance = 8;
+  glControls.maxDistance = 60;
+  glControls.addEventListener('change', () => { needsRender = true; });
+  glControls.addEventListener('start', () => {
+    if (cam3d.ortho) {
+      cam3d.ortho = false;
+      glPerspCam.position.copy(glOrthoCam.position);
+      glPerspCam.quaternion.copy(glOrthoCam.quaternion);
+      glControls.object = glPerspCam;
+      document.querySelectorAll('.cam-btn').forEach(b => b.classList.toggle('active', b.id === 'cam-free'));
+    }
+  });
+
+  syncOrbitFromCam();
+
+  glFieldLineGroup = new THREE.Group();
+  glContourGroup = new THREE.Group();
+  glChargeGroup = new THREE.Group();
+  glAxesGroup = new THREE.Group();
+  glScene.add(glFieldLineGroup, glContourGroup, glChargeGroup, glAxesGroup);
+
+  buildGLAxes();
+}
+
+function syncOrbitFromCam() {
+  const ce = Math.cos(cam3d.el), se = Math.sin(cam3d.el);
+  const ca = Math.cos(cam3d.az), sa = Math.sin(cam3d.az);
+  const eyeX = cam3d.target[0] + cam3d.dist * ce * sa;
+  const eyeY = cam3d.target[1] + cam3d.dist * se;
+  const eyeZ = cam3d.target[2] + cam3d.dist * ce * ca;
+
+  const cam = cam3d.ortho ? glOrthoCam : glPerspCam;
+  cam.position.set(eyeX, eyeY, eyeZ);
+  cam.lookAt(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
+  cam.updateProjectionMatrix();
+
+  if (cam3d.ortho) {
+    const w = glCanvas.clientWidth, h = glCanvas.clientHeight;
+    const halfH = cam3d.dist * 0.42, halfW = halfH * (w / h);
+    glOrthoCam.left = -halfW; glOrthoCam.right = halfW;
+    glOrthoCam.top = halfH; glOrthoCam.bottom = -halfH;
+    glOrthoCam.updateProjectionMatrix();
+  }
+
+  glControls.object = cam;
+  glControls.target.set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
+  glControls.update();
+}
+
+function syncCamFromOrbit() {
+  const cam = glControls.object;
+  const t = glControls.target;
+  const dx = cam.position.x - t.x, dy = cam.position.y - t.y, dz = cam.position.z - t.z;
+  cam3d.dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  cam3d.el = Math.asin(Math.max(-1, Math.min(1, dy / cam3d.dist)));
+  cam3d.az = Math.atan2(dx, dz);
+  cam3d.target = [t.x, t.y, t.z];
+}
+
+function resizeGL() {
+  if (!glRenderer) return;
+  const w = glCanvas.clientWidth, h = glCanvas.clientHeight;
+  glRenderer.setSize(w, h, false);
+  glPerspCam.aspect = w / h;
+  glPerspCam.updateProjectionMatrix();
+  const halfH = cam3d.dist * 0.42, halfW = halfH * (w / h);
+  glOrthoCam.left = -halfW; glOrthoCam.right = halfW;
+  glOrthoCam.top = halfH; glOrthoCam.bottom = -halfH;
+  glOrthoCam.updateProjectionMatrix();
+}
+
+function buildGLSurface() {
+  if (glSurfaceMesh) {
+    glScene.remove(glSurfaceMesh);
+    glSurfaceMesh.geometry.dispose();
+    glSurfaceMesh.material.dispose();
+    glSurfaceMesh = null;
+  }
+  if (glSurfaceWire) {
+    glScene.remove(glSurfaceWire);
+    glSurfaceWire.geometry.dispose();
+    glSurfaceWire.material.dispose();
+    glSurfaceWire = null;
+  }
+  if (!surface3dCache || state.charges.length === 0) return;
+
+  const { xArr, yArr, pots, nx, ny, zCap } = surface3dCache;
+
+  const vCount = nx * ny;
+  const positions = new Float32Array(vCount * 3);
+  const colors = new Float32Array(vCount * 3);
+
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const idx = iy * nx + ix;
+      const z = potentialToSurfaceZ(pots[idx]);
+      positions[idx * 3]     = xArr[ix];
+      positions[idx * 3 + 1] = z;
+      positions[idx * 3 + 2] = yArr[iy];
+
+      const t = Math.max(0, Math.min(1, (z / zCap + 1) / 2));
+      const [r, g, b] = equipotColor(t);
+      const muted = [
+        r * 0.20 + 150 * 0.80,
+        g * 0.20 + 170 * 0.80,
+        b * 0.20 + 182 * 0.80,
+      ];
+      colors[idx * 3]     = muted[0] / 255;
+      colors[idx * 3 + 1] = muted[1] / 255;
+      colors[idx * 3 + 2] = muted[2] / 255;
+    }
+  }
+
+  const indices = [];
+  for (let iy = 0; iy < ny - 1; iy++) {
+    for (let ix = 0; ix < nx - 1; ix++) {
+      const a = iy * nx + ix;
+      const b = a + 1;
+      const c = (iy + 1) * nx + ix;
+      const d = c + 1;
+      indices.push(a, b, c);
+      indices.push(b, d, c);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+
+  glSurfaceMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: surfaceAlpha,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  glSurfaceMesh = new THREE.Mesh(geom, glSurfaceMat);
+  glSurfaceMesh.renderOrder = 1;
+  glScene.add(glSurfaceMesh);
+
+  const wireGeom = new THREE.WireframeGeometry(geom);
+  const wireMat = new THREE.LineBasicMaterial({
+    color: 0xd7e6f2,
+    transparent: true,
+    opacity: 0.08,
+    depthWrite: false,
+  });
+  glSurfaceWire = new THREE.LineSegments(wireGeom, wireMat);
+  glSurfaceWire.position.y += 0.02;
+  glSurfaceWire.renderOrder = 2;
+  glScene.add(glSurfaceWire);
+}
+
+function buildGLFieldLines() {
+  while (glFieldLineGroup.children.length) {
+    const c = glFieldLineGroup.children[0];
+    c.geometry.dispose(); c.material.dispose();
+    glFieldLineGroup.remove(c);
+  }
+  if (!cachedFieldLines.length) return;
+
+  for (const fl of cachedFieldLines) {
+    if (fl.points.length < 2) continue;
+    const pts = [];
+    for (const pt of fl.points) pts.push(pt.x, 0, pt.y);
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: fl.isPos ? 0xff8c3c : 0x50a0ff,
+      transparent: true, opacity: 0.55,
+    });
+    glFieldLineGroup.add(new THREE.Line(geom, mat));
+  }
+}
+
+function buildGLContours() {
+  while (glContourGroup.children.length) {
+    const c = glContourGroup.children[0];
+    c.geometry.dispose(); c.material.dispose();
+    glContourGroup.remove(c);
+  }
+  if (!state.show.equipotential || !cachedEquipLines.length || !surface3dCache) return;
+
+  const { zCap } = surface3dCache;
+  const contourOpacity = parseFloat(document.getElementById('eq-opacity')?.value || '0.7');
+  const contourLift = Math.max(0.05, zCap * 0.008);
+
+  for (const eq of cachedEquipLines) {
+    if (!eq.segments.length) continue;
+    const z = potentialToSurfaceZ(eq.level) + contourLift;
+    const pts = [];
+    for (const s of eq.segments) {
+      pts.push(s.x1, z, s.y1, s.x2, z, s.y2);
+    }
+    const [r, g, b] = eq.color;
+    const strongColor = new THREE.Color(
+      (r * 0.30 + 255 * 0.70) / 255,
+      (g * 0.30 + 248 * 0.70) / 255,
+      (b * 0.30 + 240 * 0.70) / 255
+    );
+
+    const geomBase = new THREE.BufferGeometry();
+    geomBase.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const matBase = new THREE.LineBasicMaterial({
+      color: strongColor,
+      transparent: true,
+      opacity: Math.min(1, contourOpacity),
+      depthWrite: false,
+    });
+    const baseLines = new THREE.LineSegments(geomBase, matBase);
+    baseLines.renderOrder = 4;
+    glContourGroup.add(baseLines);
+
+    const highlightPts = [];
+    const z2 = z + contourLift * 0.55;
+    for (const s of eq.segments) {
+      highlightPts.push(s.x1, z2, s.y1, s.x2, z2, s.y2);
+    }
+    const geomHighlight = new THREE.BufferGeometry();
+    geomHighlight.setAttribute('position', new THREE.Float32BufferAttribute(highlightPts, 3));
+    const matHighlight = new THREE.LineBasicMaterial({
+      color: 0xdff9ff,
+      transparent: true,
+      opacity: Math.min(1, contourOpacity * 0.7),
+      depthWrite: false,
+    });
+    const highlightLines = new THREE.LineSegments(geomHighlight, matHighlight);
+    highlightLines.renderOrder = 5;
+    glContourGroup.add(highlightLines);
+  }
+}
+
+const _chargeSphereGeom = new THREE.SphereGeometry(0.35, 16, 12);
+
+function buildGLCharges() {
+  while (glChargeGroup.children.length) {
+    const c = glChargeGroup.children[0];
+    c.material.dispose();
+    glChargeGroup.remove(c);
+  }
+  if (!surface3dCache) return;
+
+  const { zCap } = surface3dCache;
+  for (const c of state.charges) {
+    const rawV = potentialAt(c.x, c.y);
+    const cz = Math.max(-zCap, Math.min(zCap, potentialToSurfaceZ(rawV)));
+    const isPos = c.q > 0;
+    const mat = new THREE.MeshBasicMaterial({
+      color: isPos ? 0xff6644 : 0x4499ff,
+    });
+    const sphere = new THREE.Mesh(_chargeSphereGeom, mat);
+    sphere.position.set(c.x, cz, c.y);
+    glChargeGroup.add(sphere);
+  }
+}
+
+function buildGLAxes() {
+  while (glAxesGroup.children.length) {
+    const c = glAxesGroup.children[0];
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+    glAxesGroup.remove(c);
+  }
+
+  const len = 15;
+  const phiLen = surface3dCache ? surface3dCache.zCap : len;
+  const axes = [
+    { to: [len, 0, 0], color: 0xff5544 },
+    { to: [0, phiLen, 0], color: 0x44dd44 },
+    { to: [0, 0, len], color: 0x4499ff },
+  ];
+
+  for (const a of axes) {
+    const pts = [0, 0, 0, a.to[0], a.to[1], a.to[2]];
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const mat = new THREE.LineBasicMaterial({ color: a.color, transparent: true, opacity: 0.55 });
+    glAxesGroup.add(new THREE.Line(geom, mat));
+  }
+
+  const makeLabel = (text, color, pos) => {
+    const c2d = document.createElement('canvas');
+    c2d.width = 128; c2d.height = 48;
+    const c = c2d.getContext('2d');
+    c.clearRect(0, 0, c2d.width, c2d.height);
+    c.font = 'bold 28px sans-serif';
+    c.fillStyle = color;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(text, 64, 24);
+    const tex = new THREE.CanvasTexture(c2d);
+    tex.minFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    const spriteMat = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      depthTest: false,
+      alphaTest: 0.08,
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.set(pos[0], pos[1], pos[2]);
+    sprite.scale.set(3.5, 1.3, 1);
+    glAxesGroup.add(sprite);
+  };
+
+  makeLabel('x', '#ff5544', [len + 1.5, 0, 0]);
+  makeLabel('φ', '#44dd44', [0, phiLen + 1.5, 0]);
+  makeLabel('y', '#4499ff', [0, 0, len + 1.5]);
+}
+
+function renderGL() {
+  if (!glRenderer) return;
+  const cam = cam3d.ortho ? glOrthoCam : glPerspCam;
+  glControls.object = cam;
+  glControls.update();
+  glRenderer.render(glScene, cam);
+}
+
+function rebuildAllGL() {
+  buildGLSurface();
+  buildGLFieldLines();
+  buildGLContours();
+  buildGLCharges();
+  buildGLAxes();
+}
+
+// ============================================================
+//  Canvas Setup & Init
+// ============================================================
+function setupCanvas() {
+  canvas = document.getElementById('main-canvas');
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx = canvas.getContext('2d');
+}
+
+function init() {
+  setupCanvas();
+  initThreeJS();
+  setupEvents();
+  document.getElementById('loading').style.opacity = '0';
+  setTimeout(() => document.getElementById('loading').style.display = 'none', 500);
+  loadPreset('single_pos');
+  animLoop();
+}
+
+// Expose functions and vars for HTML inline handlers (module scripts don't pollute global scope)
+Object.assign(window, {
+  switchView, setCamPreset, loadPreset, addCharge,
+  toggleOption, requestPhysicsUpdate, requestRender,
+  onQualitySliderChange, updateSurfaceAlpha, updateSurfaceZScale, updateEquipotentialOpacity,
+  toggleProbeMode, clearProbes,
+  toggleChart, resetView, exportImage, clearAll,
+  setChartView, onChartPathTypeChange, updateChart,
+  removeCharge, updateChargeQ, removeProbe
+});
+
+init();
+</script>
+</body>
+</html>

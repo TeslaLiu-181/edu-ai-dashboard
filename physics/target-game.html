@@ -1,0 +1,1771 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>带电粒子电场打靶游戏</title>
+    <style>
+      :root {
+        --bg: #eef5f1;
+        --paper: #fffaf0;
+        --panel: #ffffff;
+        --ink: #182338;
+        --muted: #667085;
+        --line: #d8e1dd;
+        --green: #13856f;
+        --green-dark: #0b6554;
+        --orange: #e28b21;
+        --orange-dark: #a95f0c;
+        --red: #c74444;
+        --blue: #2376bd;
+        --cyan: #0f9aa0;
+        --shadow: 0 18px 44px rgba(34, 58, 72, 0.16);
+        font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100dvh;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 16% 10%, rgba(226, 139, 33, 0.18), transparent 18rem),
+          radial-gradient(circle at 86% 4%, rgba(19, 133, 111, 0.18), transparent 20rem),
+          linear-gradient(135deg, #f8fbf4 0%, var(--bg) 58%, #ddebe6 100%);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 800;
+        transition:
+          transform 140ms ease,
+          box-shadow 140ms ease,
+          filter 140ms ease;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.02);
+      }
+
+      button:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+
+      button:disabled,
+      input:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 3px solid rgba(19, 133, 111, 0.28);
+        outline-offset: 2px;
+      }
+
+      .game-shell {
+        width: min(1880px, calc(100% - 20px));
+        margin: 0 auto;
+        padding: 10px 0 12px;
+      }
+
+      .scorebar {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+        border: 1px solid rgba(216, 225, 221, 0.94);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: clamp(1.35rem, 2vw, 2rem);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .brand p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .score-cluster {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .score-pill,
+      .attempt-control {
+        min-height: 42px;
+        padding: 7px 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .score-pill span,
+      .attempt-control span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .score-pill strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 1.04rem;
+      }
+
+      .attempt-control {
+        display: grid;
+        grid-template-columns: auto 58px;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .attempt-control input {
+        width: 54px;
+        min-height: 30px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        color: var(--ink);
+        font-weight: 800;
+      }
+
+      .game-grid {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .panel,
+      .arena-panel {
+        border: 1px solid rgba(216, 225, 221, 0.96);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: var(--shadow);
+      }
+
+      .panel {
+        padding: 12px;
+      }
+
+      .game-grid > .panel:first-child {
+        grid-row: 1 / span 2;
+      }
+
+      .mission-card {
+        position: relative;
+        padding: 13px;
+        border-radius: 8px;
+        overflow: hidden;
+        background:
+          linear-gradient(135deg, rgba(255, 241, 213, 0.94), rgba(255, 252, 244, 0.98)),
+          #fff8e7;
+        border: 1px solid #f0d7a9;
+      }
+
+      .mission-card::after {
+        content: "";
+        position: absolute;
+        width: 88px;
+        height: 88px;
+        right: -32px;
+        top: -32px;
+        border-radius: 50%;
+        background: rgba(226, 139, 33, 0.14);
+      }
+
+      .label {
+        display: block;
+        color: var(--green-dark);
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .mission-card h2,
+      .side-title,
+      .result-title {
+        margin: 7px 0 7px;
+        font-size: 1.12rem;
+        line-height: 1.2;
+      }
+
+      .mission-card p,
+      .hint,
+      .result-text {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.58;
+      }
+
+      .phase-strip {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin: 10px 0;
+      }
+
+      .phase-step {
+        min-height: 48px;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fbf8;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .phase-step.is-active {
+        border-color: rgba(19, 133, 111, 0.45);
+        background: rgba(19, 133, 111, 0.1);
+        color: var(--green-dark);
+      }
+
+      .button-stack {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 10px 0;
+      }
+
+      .button-stack .wide {
+        grid-column: 1 / -1;
+      }
+
+      .btn {
+        min-height: 39px;
+        padding: 0 12px;
+        color: var(--ink);
+        background: #fff;
+        border: 1px solid var(--line);
+      }
+
+      .btn.primary {
+        color: #fff;
+        background: linear-gradient(180deg, var(--green), var(--green-dark));
+        border: 0;
+        box-shadow: 0 8px 16px rgba(19, 133, 111, 0.25);
+      }
+
+      .btn.fire {
+        color: #fff;
+        background: linear-gradient(180deg, #f3a533, var(--orange));
+        border: 0;
+        box-shadow: 0 8px 16px rgba(226, 139, 33, 0.26);
+      }
+
+      .btn.danger {
+        color: #fff;
+        background: linear-gradient(180deg, #db5b5f, #b7353b);
+      }
+
+      .arena-panel {
+        grid-column: 2;
+        grid-row: 1;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto auto auto;
+      }
+
+      .arena-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 48px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 252, 244, 0.84);
+      }
+
+      .arena-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 800;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--orange);
+        box-shadow: 0 0 0 6px rgba(226, 139, 33, 0.16);
+      }
+
+      .dot.green {
+        background: var(--green);
+        box-shadow: 0 0 0 6px rgba(19, 133, 111, 0.16);
+      }
+
+      .readout {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .readout span {
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 0.86rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .canvas-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        height: clamp(420px, calc(100dvh - 430px), 680px);
+        min-height: 0;
+        overflow: hidden;
+        background:
+          linear-gradient(rgba(29, 78, 111, 0.07) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(29, 78, 111, 0.07) 1px, transparent 1px),
+          linear-gradient(180deg, #fffdf6, #f6fbfb);
+        background-size: 34px 34px;
+      }
+
+      #gameCanvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+      }
+
+      .attempt-log {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 46px;
+        padding: 8px 12px;
+        border-top: 1px solid var(--line);
+        overflow-x: auto;
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .attempt-chip {
+        flex: 0 0 auto;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: #f3f7f5;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .attempt-chip.hit {
+        color: var(--green-dark);
+        background: rgba(19, 133, 111, 0.11);
+        border-color: rgba(19, 133, 111, 0.32);
+      }
+
+      .attempt-chip.crash {
+        color: #9b282e;
+        background: rgba(199, 68, 68, 0.1);
+        border-color: rgba(199, 68, 68, 0.25);
+      }
+
+      .control-block,
+      .result-block {
+        padding: 11px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .control-block:first-child,
+      .result-block:first-child {
+        padding-top: 0;
+      }
+
+      .control-block:last-child,
+      .result-block:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .param-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        margin: 12px 0;
+      }
+
+      .param-row label {
+        color: var(--muted);
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+
+      .param-row strong {
+        color: var(--ink);
+        font-size: 0.92rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .param-row input {
+        grid-column: 1 / -1;
+        width: 100%;
+        accent-color: var(--green);
+      }
+
+      .param-row.is-locked {
+        opacity: 0.56;
+      }
+
+      .lock-note {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #f3f7f5;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 900;
+      }
+
+      .result-card {
+        padding: 14px;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(236, 252, 246, 0.92), rgba(255, 255, 255, 0.96)),
+          #fff;
+        border: 1px solid rgba(19, 133, 111, 0.18);
+      }
+
+      .right-panel {
+        grid-column: 2;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(270px, 0.78fr) minmax(520px, 1.75fr) minmax(260px, 0.78fr);
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .right-panel .result-block {
+        min-width: 0;
+        padding: 0;
+        border-bottom: 0;
+      }
+
+      .right-panel .result-card {
+        height: 100%;
+        padding: 12px;
+      }
+
+      .right-panel .side-title,
+      .right-panel .result-title {
+        margin-top: 0;
+      }
+
+      .right-panel .hint,
+      .right-panel .result-text {
+        font-size: 0.84rem;
+        line-height: 1.42;
+      }
+
+      .right-panel #paramControls {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(118px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .right-panel .param-row {
+        min-width: 0;
+        margin: 0;
+        padding: 8px 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfb;
+      }
+
+      .right-panel .param-row label,
+      .right-panel .param-row strong {
+        font-size: 0.78rem;
+      }
+
+      .right-panel .param-row input {
+        margin: 0;
+      }
+
+      .right-panel .lock-note {
+        grid-column: 1 / -1;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+      }
+
+      .stars {
+        margin-top: 8px;
+        color: var(--orange);
+        font-size: 1.35rem;
+        line-height: 1;
+        letter-spacing: 3px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+        margin-top: 8px;
+      }
+
+      .metric {
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfb;
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 800;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .formula-list {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .formula-list div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      code {
+        padding: 4px 8px;
+        border-radius: 7px;
+        background: rgba(15, 154, 160, 0.13);
+        color: #087a80;
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-weight: 800;
+      }
+
+      .group-box {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px;
+      }
+
+      .group-box input {
+        min-height: 38px;
+        width: 100%;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        font-weight: 800;
+      }
+
+      .group-box button {
+        min-height: 38px;
+        padding: 0 10px;
+        color: var(--green-dark);
+        background: rgba(19, 133, 111, 0.1);
+        border: 1px solid rgba(19, 133, 111, 0.24);
+      }
+
+      @media (max-width: 1260px) {
+        .game-grid {
+          grid-template-columns: 260px minmax(0, 1fr);
+        }
+
+        .right-panel {
+          grid-column: 2;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .right-panel #paramControls {
+          grid-template-columns: repeat(3, minmax(130px, 1fr));
+        }
+      }
+
+      @media (max-width: 860px) {
+        .game-shell {
+          width: calc(100% - 18px);
+          max-width: 680px;
+          padding-top: 9px;
+        }
+
+        .scorebar,
+        .game-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .game-grid > .panel:first-child,
+        .arena-panel,
+        .right-panel {
+          grid-column: 1;
+          grid-row: auto;
+        }
+
+        .right-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .right-panel #paramControls {
+          grid-template-columns: 1fr;
+        }
+
+        .score-cluster {
+          justify-content: flex-start;
+        }
+
+        .canvas-wrap,
+        #gameCanvas {
+          height: 420px;
+        }
+
+        .canvas-wrap {
+          aspect-ratio: auto;
+        }
+
+        .arena-toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .readout {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-shell">
+      <header class="scorebar">
+        <div class="brand">
+          <h1>带电粒子电场打靶赛</h1>
+          <p>调参数，发射一颗粒子，命中靶标赢下本关</p>
+        </div>
+        <div class="score-cluster">
+          <div class="score-pill"><span>小组</span><strong id="groupName">第 1 组</strong></div>
+          <div class="score-pill"><span>关卡</span><strong id="levelNo">1</strong></div>
+          <div class="score-pill"><span>总分</span><strong id="totalScore">0</strong></div>
+          <div class="score-pill"><span>连胜</span><strong id="streak">0</strong></div>
+          <div class="attempt-control">
+            <span>试射次数</span>
+            <input id="maxAttempts" type="number" min="1" max="10" value="3" />
+          </div>
+        </div>
+      </header>
+
+      <main class="game-grid">
+        <aside class="panel">
+          <section class="mission-card">
+            <span class="label">本关任务</span>
+            <h2 id="missionTitle">调节电压 U</h2>
+            <p id="missionText">改变两板电压，让粒子刚好击中靶标。</p>
+          </section>
+
+          <section class="phase-strip" aria-label="游戏阶段">
+            <div class="phase-step" id="phaseSetup">1 布置</div>
+            <div class="phase-step" id="phaseChallenge">2 挑战</div>
+            <div class="phase-step" id="phaseResult">3 结算</div>
+          </section>
+
+          <section class="button-stack">
+            <button class="btn" id="randomTargetBtn" type="button">随机靶标</button>
+            <button class="btn" id="newLevelBtn" type="button">新关卡</button>
+            <button class="btn primary wide" id="startBtn" type="button">开始挑战</button>
+            <button class="btn fire wide" id="fireBtn" type="button">发射粒子</button>
+            <button class="btn" id="resetAttemptBtn" type="button">重置本关</button>
+            <button class="btn danger" id="nextLevelBtn" type="button">下一关</button>
+          </section>
+
+          <section class="control-block">
+            <h2 class="side-title">小组信息</h2>
+            <p class="hint">输入小组名后，比分栏会同步更新。刷新页面后分数清空。</p>
+            <div class="group-box">
+              <input id="groupInput" type="text" value="第 1 组" aria-label="小组名" />
+              <button id="saveGroupBtn" type="button">更新</button>
+            </div>
+          </section>
+
+          <section class="control-block">
+            <h2 class="side-title">玩法提示</h2>
+            <p class="hint" id="playHint">布置阶段可拖动靶标；开始挑战后靶标锁定，只能调本关指定参数。</p>
+          </section>
+        </aside>
+
+        <section class="arena-panel">
+          <div class="arena-toolbar">
+            <div class="arena-status"><span class="dot" id="phaseDot"></span><span id="phaseText">布置阶段：拖动或随机靶标</span></div>
+            <div class="readout">
+              <span id="attemptReadout">剩余 3 / 3</span>
+              <span id="fieldReadout">E = 20.0</span>
+              <span id="accelReadout">a = 30.0</span>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="gameCanvas" width="980" height="620" aria-label="带电粒子电场打靶游戏画布"></canvas>
+          </div>
+          <div class="attempt-log" id="attemptLog">
+            <span class="attempt-chip">暂无试射</span>
+          </div>
+        </section>
+
+        <aside class="panel right-panel">
+          <section class="result-block">
+            <div class="result-card">
+              <span class="label">战况</span>
+              <h2 class="result-title" id="resultTitle">等待布置靶标</h2>
+              <p class="result-text" id="resultText">拖动靶标或随机布置后，点击开始挑战。</p>
+              <div class="stars" id="stars">☆☆☆</div>
+              <div class="metric-grid">
+                <div class="metric"><span>本关得分</span><strong id="levelScore">0</strong></div>
+                <div class="metric"><span>最近距离</span><strong id="nearestDistance">--</strong></div>
+                <div class="metric"><span>偏转方向</span><strong id="deflectDirection">--</strong></div>
+                <div class="metric"><span>碰板次数</span><strong id="crashCount">0</strong></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="result-block">
+            <h2 class="side-title">参数面板</h2>
+            <p class="hint">只有本关任务参数可调，其他参数锁定。</p>
+            <div id="paramControls"></div>
+          </section>
+
+          <section class="result-block">
+            <h2 class="side-title">物理解释</h2>
+            <p class="hint" id="physicsHint">E=U/d，正电荷沿电场方向偏转，负电荷反向偏转。</p>
+            <div class="formula-list">
+              <div><span>电场强度</span><code>E=U/d</code></div>
+              <div><span>电场力</span><code>F=qE</code></div>
+              <div><span>加速度</span><code>a=qE/m</code></div>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const $ = (id) => document.getElementById(id);
+
+      const ui = {
+        groupName: $("groupName"),
+        groupInput: $("groupInput"),
+        saveGroupBtn: $("saveGroupBtn"),
+        levelNo: $("levelNo"),
+        totalScore: $("totalScore"),
+        streak: $("streak"),
+        maxAttempts: $("maxAttempts"),
+        missionTitle: $("missionTitle"),
+        missionText: $("missionText"),
+        phaseSetup: $("phaseSetup"),
+        phaseChallenge: $("phaseChallenge"),
+        phaseResult: $("phaseResult"),
+        phaseDot: $("phaseDot"),
+        phaseText: $("phaseText"),
+        attemptReadout: $("attemptReadout"),
+        fieldReadout: $("fieldReadout"),
+        accelReadout: $("accelReadout"),
+        randomTargetBtn: $("randomTargetBtn"),
+        newLevelBtn: $("newLevelBtn"),
+        startBtn: $("startBtn"),
+        fireBtn: $("fireBtn"),
+        resetAttemptBtn: $("resetAttemptBtn"),
+        nextLevelBtn: $("nextLevelBtn"),
+        attemptLog: $("attemptLog"),
+        resultTitle: $("resultTitle"),
+        resultText: $("resultText"),
+        stars: $("stars"),
+        levelScore: $("levelScore"),
+        nearestDistance: $("nearestDistance"),
+        deflectDirection: $("deflectDirection"),
+        crashCount: $("crashCount"),
+        paramControls: $("paramControls"),
+        physicsHint: $("physicsHint"),
+      };
+
+      const paramDefs = {
+        q: { label: "电荷量 q", unit: "", min: -4, max: 4, step: 0.1, digits: 1 },
+        m: { label: "质量 m", unit: "", min: 0.8, max: 7, step: 0.1, digits: 1 },
+        v0: { label: "初速度 v0", unit: "", min: 170, max: 540, step: 5, digits: 0 },
+        U: { label: "两板电压 U", unit: "V", min: 40, max: 230, step: 5, digits: 0 },
+        d: { label: "板间距 d", unit: "cm", min: 4, max: 13, step: 0.2, digits: 1 },
+      };
+
+      const missions = [
+        { key: "q", title: "调节电荷量 q", text: "改变电荷量大小或正负，让粒子命中靶标。", hint: "q 变号会让受力方向反转；|q| 越大，偏转越明显。" },
+        { key: "m", title: "调节质量 m", text: "只调粒子质量，找到合适的偏转程度。", hint: "m 越大，a=qE/m 越小，同样电场下越不容易偏转。" },
+        { key: "v0", title: "调节初速度 v0", text: "只调初速度大小，控制粒子在电场中的停留时间。", hint: "v0 越大，板间停留时间越短，偏转通常越小。" },
+        { key: "U", title: "调节两板电压 U", text: "只调两板电压，改变电场强度。", hint: "U 增大时 E=U/d 增大，电场力变大，偏转更明显。" },
+        { key: "d", title: "调节板间距 d", text: "只调板间距，改变电场强弱和靶场宽度。", hint: "d 增大时 E=U/d 减小，偏转通常会变小。" },
+      ];
+
+      const state = {
+        phase: "setup",
+        layout: null,
+        levelNo: 1,
+        mission: missions[0],
+        params: { q: 1.5, m: 2.4, v0: 330, U: 120, d: 6 },
+        solutionParams: null,
+        target: { xRatio: 0.76, yRatio: 0.54 },
+        lockedTarget: null,
+        maxAttempts: 3,
+        usedAttempts: 0,
+        crashCount: 0,
+        history: [],
+        currentShot: null,
+        running: false,
+        shotTime: 0,
+        lastFrame: 0,
+        totalScore: 0,
+        levelScore: 0,
+        streak: 0,
+        nearestDistance: Infinity,
+        result: "setup",
+        draggingTarget: false,
+        popups: [],
+        wave: null,
+      };
+
+      function rand(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function randChoice(list) {
+        return list[Math.floor(Math.random() * list.length)];
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function invLerp(a, b, value) {
+        return (value - a) / Math.max(1, b - a);
+      }
+
+      function formatParam(key, value) {
+        const def = paramDefs[key];
+        const sign = key === "q" && value > 0 ? "+" : "";
+        return `${sign}${Number(value).toFixed(def.digits)}${def.unit ? ` ${def.unit}` : ""}`;
+      }
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(620, Math.round(rect.width * dpr));
+        canvas.height = Math.max(460, Math.round(rect.height * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        state.layout = computeLayout(rect.width, rect.height, state.params.d);
+        render();
+      }
+
+      function computeLayout(width, height, dValue) {
+        const padX = Math.max(30, width * 0.045);
+        const fieldStart = padX + Math.min(138, width * 0.18);
+        const fieldEnd = width - padX - 42;
+        const centerY = height * 0.52;
+        const dRatio = (dValue - paramDefs.d.min) / (paramDefs.d.max - paramDefs.d.min);
+        const gap = clamp(lerp(220, 330, dRatio), height * 0.38, height * 0.62);
+        const top = centerY - gap / 2;
+        const bottom = centerY + gap / 2;
+        return {
+          width,
+          height,
+          fieldStart,
+          fieldEnd,
+          centerY: (top + bottom) / 2,
+          top,
+          bottom,
+          gap: bottom - top,
+          launchX: Math.max(34, fieldStart - 82),
+          launchY: (top + bottom) / 2,
+          particleRadius: 8,
+          targetRadius: 18,
+        };
+      }
+
+      function targetPoint(layout = state.layout, target = state.lockedTarget || state.target) {
+        if (target.xRatio !== undefined && target.yRatio !== undefined) {
+          return {
+            x: target.xRatio * layout.width,
+            y: target.yRatio * layout.height,
+          };
+        }
+        return {
+          x: lerp(layout.fieldStart + 90, layout.fieldEnd - 48, target.xPct),
+          y: lerp(layout.top + 36, layout.bottom - 36, target.yPct),
+        };
+      }
+
+      function targetFromPoint(point, layout = state.layout) {
+        return {
+          xRatio: clamp(point.x / layout.width, 0, 1),
+          yRatio: clamp(point.y / layout.height, 0, 1),
+        };
+      }
+
+      function electricScale(params) {
+        const electricField = params.U / params.d;
+        const force = params.q * electricField;
+        const accel = force / Math.max(0.1, params.m);
+        return { electricField, force, accel, pixelAccel: accel * 10.6 };
+      }
+
+      function simulate(params, layout = state.layout, target = state.lockedTarget || state.target) {
+        const targetPx = targetPoint(layout, target);
+        const { pixelAccel, electricField, force, accel } = electricScale(params);
+        const vx = Math.max(60, params.v0);
+        const start = { x: layout.launchX, y: layout.launchY };
+        const enterT = Math.max(0, (layout.fieldStart - start.x) / vx);
+        const leaveT = Math.max(enterT, (layout.fieldEnd - start.x) / vx);
+        const fieldDuration = leaveT - enterT;
+        const yAtLeave = start.y + 0.5 * pixelAccel * fieldDuration * fieldDuration;
+        const vyAtLeave = pixelAccel * fieldDuration;
+        const dt = 0.01;
+        const maxT = Math.min(6, (layout.fieldEnd - layout.launchX + 95) / vx + 1.1);
+        const points = [];
+        let hit = false;
+        let crash = false;
+        let nearest = Infinity;
+        let hitPoint = null;
+        let crashPoint = null;
+
+        for (let t = 0; t <= maxT; t += dt) {
+          const x = start.x + vx * t;
+          let y = start.y;
+          let vy = 0;
+          let ay = 0;
+          let phase = "before";
+          if (t >= enterT && t <= leaveT) {
+            const tau = t - enterT;
+            y = start.y + 0.5 * pixelAccel * tau * tau;
+            vy = pixelAccel * tau;
+            ay = pixelAccel;
+            phase = "field";
+          } else if (t > leaveT) {
+            y = yAtLeave + vyAtLeave * (t - leaveT);
+            vy = vyAtLeave;
+            phase = "after";
+          }
+          const point = { x, y, t, vx, vy, ay, phase };
+          points.push(point);
+
+          const distance = Math.hypot(x - targetPx.x, y - targetPx.y);
+          if (distance < nearest) nearest = distance;
+          if (distance <= layout.targetRadius) {
+            hit = true;
+            hitPoint = point;
+            break;
+          }
+
+          if (
+            x >= layout.fieldStart &&
+            x <= layout.fieldEnd &&
+            (y <= layout.top + layout.particleRadius || y >= layout.bottom - layout.particleRadius)
+          ) {
+            crash = true;
+            crashPoint = point;
+            break;
+          }
+
+          if (x > layout.fieldEnd + 70) break;
+        }
+
+        const finalPoint = hitPoint || crashPoint || points[points.length - 1] || start;
+        const offset = finalPoint.y - layout.launchY;
+        return {
+          points,
+          targetPx,
+          hit,
+          crash,
+          nearest,
+          finalPoint,
+          offset,
+          electricField,
+          force,
+          accel,
+          maxT,
+        };
+      }
+
+      function valueNearIdeal(key, ideal) {
+        const def = paramDefs[key];
+        let value = ideal;
+        if (key === "q") {
+          const direction = Math.random() > 0.5 ? 1 : -1;
+          value = ideal + direction * rand(0.9, 1.8);
+          if (Math.abs(value) < 0.35) value += direction * 0.8;
+        } else {
+          const factor = randChoice([0.62, 0.72, 1.28, 1.42]);
+          value = ideal * factor;
+        }
+        return clamp(roundToStep(value, def.step), def.min, def.max);
+      }
+
+      function roundToStep(value, step) {
+        return Math.round(value / step) * step;
+      }
+
+      function currentCanvasSize() {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          width: rect.width || 980,
+          height: rect.height || 620,
+        };
+      }
+
+      function targetIsReachable(target, baseParams = state.params) {
+        const key = state.mission.key;
+        const def = paramDefs[key];
+        const size = currentCanvasSize();
+        for (let value = def.min; value <= def.max + def.step / 2; value += def.step) {
+          const params = { ...baseParams, [key]: roundToStep(value, def.step) };
+          if (key === "q" && Math.abs(params.q) < 0.05) continue;
+          const layout = computeLayout(size.width, size.height, params.d);
+          const sim = simulate(params, layout, target);
+          if (sim.hit && !sim.crash) return true;
+        }
+        return false;
+      }
+
+      function randomReachableTarget(layout = state.layout, attempts = 80) {
+        for (let i = 0; i < attempts; i += 1) {
+          const point = {
+            x: lerp(layout.fieldStart + 90, layout.fieldEnd - 48, rand(0.18, 0.92)),
+            y: lerp(layout.top + 36, layout.bottom - 36, rand(0.14, 0.86)),
+          };
+          const candidate = targetFromPoint(point, layout);
+          if (targetIsReachable(candidate)) return candidate;
+        }
+        return null;
+      }
+
+      function generateLevel(keepLevelNo = false) {
+        state.phase = "setup";
+        state.running = false;
+        state.result = "setup";
+        state.lockedTarget = null;
+        state.usedAttempts = 0;
+        state.crashCount = 0;
+        state.levelScore = 0;
+        state.nearestDistance = Infinity;
+        state.history = [];
+        state.currentShot = null;
+        state.popups = [];
+        state.wave = null;
+        if (!keepLevelNo) state.levelNo += state.levelNo === 0 ? 1 : 0;
+        state.maxAttempts = clamp(Number(ui.maxAttempts.value) || 3, 1, 10);
+
+        state.mission = randChoice(missions);
+        const solution = {
+          q: randChoice([-1, 1]) * rand(1.1, 3.1),
+          m: rand(1.4, 5.4),
+          v0: rand(235, 445),
+          U: rand(70, 190),
+          d: rand(5, 10.5),
+        };
+
+        Object.keys(solution).forEach((key) => {
+          solution[key] = clamp(roundToStep(solution[key], paramDefs[key].step), paramDefs[key].min, paramDefs[key].max);
+        });
+
+        const size = currentCanvasSize();
+        const playableLayout = computeLayout(size.width, size.height, solution.d);
+        let candidateTarget = null;
+        for (let i = 0; i < 20; i += 1) {
+          const sim = simulate(solution, playableLayout, { xRatio: 1.2, yRatio: 1.2 });
+          const sample = sim.points[Math.floor(sim.points.length * rand(0.58, 0.82))] || sim.finalPoint;
+          if (sample.y > playableLayout.top + 54 && sample.y < playableLayout.bottom - 54 && sample.x > playableLayout.fieldStart + 130) {
+            candidateTarget = targetFromPoint(sample, playableLayout);
+            break;
+          }
+          solution.v0 = clamp(solution.v0 + 18, paramDefs.v0.min, paramDefs.v0.max);
+        }
+
+        state.target = candidateTarget || targetFromPoint({
+          x: lerp(playableLayout.fieldStart + 90, playableLayout.fieldEnd - 48, rand(0.58, 0.88)),
+          y: lerp(playableLayout.top + 36, playableLayout.bottom - 36, rand(0.24, 0.76)),
+        }, playableLayout);
+        state.solutionParams = { ...solution };
+        state.params = { ...solution };
+        state.params[state.mission.key] = valueNearIdeal(state.mission.key, solution[state.mission.key]);
+        state.layout = computeLayout(size.width, size.height, state.params.d);
+        if (!targetIsReachable(state.target)) {
+          state.target = randomReachableTarget(state.layout) || state.target;
+        }
+        buildParamControls();
+        updateUI();
+        render();
+      }
+
+      function startChallenge() {
+        const lockedPoint = targetPoint(state.layout, state.target);
+        state.lockedTarget = targetFromPoint(lockedPoint, state.layout);
+        state.phase = "challenge";
+        state.running = false;
+        state.result = "challenge";
+        state.usedAttempts = 0;
+        state.crashCount = 0;
+        state.levelScore = 0;
+        state.history = [];
+        state.currentShot = null;
+        state.nearestDistance = Infinity;
+        state.maxAttempts = clamp(Number(ui.maxAttempts.value) || 3, 1, 10);
+        ui.maxAttempts.value = state.maxAttempts;
+        state.popups = [{ text: "靶标锁定", x: state.layout.width * 0.5, y: 86, life: 1.2, color: "#0b6554" }];
+        updateUI();
+        render();
+      }
+
+      function fireShot() {
+        if (state.phase !== "challenge" || state.running || state.usedAttempts >= state.maxAttempts) return;
+        state.running = true;
+        state.shotTime = 0;
+        state.lastFrame = performance.now();
+        const targetSnapshot = { ...(state.lockedTarget || state.target) };
+        state.currentShot = simulate(state.params, state.layout, targetSnapshot);
+        state.currentShot.target = targetSnapshot;
+        state.usedAttempts += 1;
+        updateUI();
+        requestAnimationFrame(tick);
+      }
+
+      function tick(now) {
+        if (!state.running || !state.currentShot) return;
+        const dt = Math.min(0.04, (now - state.lastFrame) / 1000);
+        state.lastFrame = now;
+        state.shotTime += dt;
+
+        const endTime = state.currentShot.finalPoint.t || state.currentShot.maxT;
+        if (state.shotTime >= endTime) {
+          state.shotTime = endTime;
+          finishShot();
+        }
+
+        render();
+        if (state.running) requestAnimationFrame(tick);
+      }
+
+      function finishShot() {
+        state.running = false;
+        const shot = state.currentShot;
+        state.nearestDistance = Math.min(state.nearestDistance, shot.nearest);
+        const record = {
+          hit: shot.hit,
+          crash: shot.crash,
+          nearest: shot.nearest,
+          offset: shot.offset,
+          params: { ...state.params },
+          target: { ...(shot.target || state.lockedTarget || state.target) },
+        };
+        state.history.push(record);
+
+        if (shot.crash) state.crashCount += 1;
+
+        if (shot.hit) {
+          completeLevel(shot);
+        } else if (state.usedAttempts >= state.maxAttempts) {
+          failLevel(shot);
+        } else {
+          const text = shot.crash ? "碰板，本次试射失败" : "未命中，继续修正参数";
+          state.popups.push({ text, x: shot.finalPoint.x, y: shot.finalPoint.y - 26, life: 1.4, color: shot.crash ? "#c74444" : "#a95f0c" });
+          state.currentShot = null;
+          updateUI();
+          render();
+        }
+      }
+
+      function completeLevel(shot) {
+        const remaining = Math.max(0, state.maxAttempts - state.usedAttempts);
+        const precision = Math.round(clamp((state.layout.targetRadius - shot.nearest) / state.layout.targetRadius, 0, 1) * 30);
+        const score = Math.max(0, 100 + remaining * 20 + precision - state.crashCount * 10 + state.streak * 15);
+        state.levelScore = score;
+        state.totalScore += score;
+        state.streak += 1;
+        state.phase = "result";
+        state.result = "hit";
+        state.wave = { x: shot.targetPx.x, y: shot.targetPx.y, life: 1.1 };
+        state.popups.push({ text: `+${score}`, x: shot.targetPx.x, y: shot.targetPx.y - 34, life: 1.6, color: "#0b6554" });
+        updateUI();
+      }
+
+      function failLevel(shot) {
+        state.levelScore = 0;
+        state.streak = 0;
+        state.phase = "result";
+        state.result = shot.crash ? "crash" : "miss";
+        state.popups.push({ text: "本关失败", x: state.layout.width * 0.5, y: 88, life: 1.4, color: "#c74444" });
+        updateUI();
+      }
+
+      function resetLevel() {
+        state.phase = "setup";
+        state.running = false;
+        state.result = "setup";
+        state.lockedTarget = null;
+        state.usedAttempts = 0;
+        state.crashCount = 0;
+        state.levelScore = 0;
+        state.history = [];
+        state.currentShot = null;
+        state.nearestDistance = Infinity;
+        state.params = { ...state.solutionParams };
+        state.params[state.mission.key] = valueNearIdeal(state.mission.key, state.solutionParams[state.mission.key]);
+        const size = currentCanvasSize();
+        state.layout = computeLayout(size.width, size.height, state.params.d);
+        buildParamControls();
+        updateUI();
+        render();
+      }
+
+      function nextLevel() {
+        state.levelNo += 1;
+        generateLevel(true);
+      }
+
+      function randomTarget() {
+        if (state.phase !== "setup") return;
+        const target = randomReachableTarget(state.layout);
+        if (!target) {
+          state.popups.push({ text: "没有找到可解靶标", x: state.layout.width * 0.5, y: 86, life: 1.0, color: "#c74444" });
+          render();
+          return;
+        }
+        state.target = target;
+        state.popups.push({ text: "靶标已随机布置", x: state.layout.width * 0.5, y: 86, life: 1.0, color: "#a95f0c" });
+        updateUI();
+        render();
+      }
+
+      function buildParamControls() {
+        ui.paramControls.innerHTML = "";
+        Object.entries(paramDefs).forEach(([key, def]) => {
+          const row = document.createElement("div");
+          const locked = key !== state.mission.key;
+          row.className = `param-row ${locked ? "is-locked" : ""}`;
+          row.innerHTML = `
+            <label for="param-${key}">${def.label}</label>
+            <strong id="value-${key}">${formatParam(key, state.params[key])}</strong>
+            <input id="param-${key}" type="range" min="${def.min}" max="${def.max}" step="${def.step}" value="${state.params[key]}" ${locked ? "disabled" : ""} />
+            ${locked ? '<span class="lock-note">本关锁定</span>' : '<span class="lock-note">本关可调</span>'}
+          `;
+          ui.paramControls.appendChild(row);
+          const input = row.querySelector("input");
+          input.addEventListener("input", () => {
+            state.params[key] = Number(input.value);
+            const size = currentCanvasSize();
+            state.layout = computeLayout(size.width, size.height, state.params.d);
+            row.querySelector(`#value-${key}`).textContent = formatParam(key, state.params[key]);
+            updateUI();
+            render();
+          });
+        });
+      }
+
+      function updateParamValues() {
+        Object.keys(paramDefs).forEach((key) => {
+          const valueEl = $(`value-${key}`);
+          const inputEl = $(`param-${key}`);
+          if (valueEl) valueEl.textContent = formatParam(key, state.params[key]);
+          if (inputEl) {
+            inputEl.value = state.params[key];
+            inputEl.disabled = key !== state.mission.key || state.running || state.phase === "result";
+          }
+        });
+      }
+
+      function currentExplanation() {
+        const key = state.mission.key;
+        const sim = simulate(state.params);
+        const direction = Math.abs(sim.offset) < 6 ? "几乎不偏转" : sim.offset > 0 ? "向下偏" : "向上偏";
+        if (key === "U") return `当前 E=U/d=${sim.electricField.toFixed(1)}。增大 U 会增强电场，粒子通常偏转更明显。`;
+        if (key === "d") return `当前 E=U/d=${sim.electricField.toFixed(1)}。增大 d 会削弱电场，同时板间空间变大。`;
+        if (key === "m") return `当前 a=qE/m=${sim.accel.toFixed(1)}。质量越大，加速度越小，偏转越弱。`;
+        if (key === "v0") return `当前轨迹${direction}。v0 越大，飞过板间越快，偏转通常越小。`;
+        return `当前 q=${formatParam("q", state.params.q)}，${state.params.q >= 0 ? "受力沿电场向下" : "受力逆电场向上"}，变号会改变偏转方向。`;
+      }
+
+      function updateUI() {
+        const sim = simulate(state.params);
+        ui.groupName.textContent = ui.groupInput.value.trim() || "未命名小组";
+        ui.levelNo.textContent = state.levelNo;
+        ui.totalScore.textContent = state.totalScore;
+        ui.streak.textContent = state.streak;
+        ui.missionTitle.textContent = state.mission.title;
+        ui.missionText.textContent = state.mission.text;
+        ui.fieldReadout.textContent = `E = ${sim.electricField.toFixed(1)}`;
+        ui.accelReadout.textContent = `a = ${sim.accel.toFixed(1)}`;
+        ui.attemptReadout.textContent = `剩余 ${Math.max(0, state.maxAttempts - state.usedAttempts)} / ${state.maxAttempts}`;
+        ui.levelScore.textContent = state.levelScore;
+        ui.nearestDistance.textContent = Number.isFinite(state.nearestDistance) ? `${state.nearestDistance.toFixed(1)} px` : "--";
+        ui.deflectDirection.textContent = Math.abs(sim.offset) < 6 ? "近似水平" : sim.offset > 0 ? "向下" : "向上";
+        ui.crashCount.textContent = state.crashCount;
+        ui.physicsHint.textContent = state.result === "hit" ? state.mission.hint : currentExplanation();
+        ui.maxAttempts.disabled = state.phase !== "setup";
+        ui.randomTargetBtn.disabled = state.phase !== "setup";
+        ui.startBtn.disabled = state.phase !== "setup";
+        ui.fireBtn.disabled = state.phase !== "challenge" || state.running || state.usedAttempts >= state.maxAttempts;
+        ui.resetAttemptBtn.disabled = state.running;
+        ui.nextLevelBtn.disabled = state.running;
+        ui.phaseDot.classList.toggle("green", state.phase === "challenge");
+        ui.phaseSetup.classList.toggle("is-active", state.phase === "setup");
+        ui.phaseChallenge.classList.toggle("is-active", state.phase === "challenge");
+        ui.phaseResult.classList.toggle("is-active", state.phase === "result");
+
+        if (state.phase === "setup") {
+          ui.phaseText.textContent = "布置阶段：拖动或随机靶标";
+          ui.resultTitle.textContent = "等待挑战";
+          ui.resultText.textContent = "靶标可拖动；点击开始挑战后锁定靶标。";
+          ui.stars.textContent = "☆☆☆";
+        } else if (state.phase === "challenge") {
+          ui.phaseText.textContent = "挑战阶段：靶标已锁定";
+          ui.resultTitle.textContent = state.running ? "粒子飞行中" : "等待发射";
+          ui.resultText.textContent = `本关只允许调节「${paramDefs[state.mission.key].label}」。`;
+          ui.stars.textContent = "☆☆☆";
+        } else if (state.result === "hit") {
+          ui.phaseText.textContent = "结算：命中目标";
+          ui.resultTitle.textContent = "胜利，命中目标";
+          ui.resultText.textContent = `用了 ${state.usedAttempts} 次试射，本关获得 ${state.levelScore} 分。`;
+          ui.stars.textContent = state.levelScore >= 130 ? "★★★" : state.levelScore >= 100 ? "★★☆" : "★☆☆";
+        } else {
+          ui.phaseText.textContent = "结算：本关失败";
+          ui.resultTitle.textContent = "本关未命中";
+          ui.resultText.textContent = "试射次数已用完，可以重置本关或进入下一关。";
+          ui.stars.textContent = "☆☆☆";
+        }
+
+        renderAttemptLog();
+        updateParamValues();
+      }
+
+      function renderAttemptLog() {
+        if (!state.history.length) {
+          ui.attemptLog.innerHTML = '<span class="attempt-chip">暂无试射</span>';
+          return;
+        }
+        ui.attemptLog.innerHTML = state.history
+          .map((record, index) => {
+            const cls = record.hit ? "hit" : record.crash ? "crash" : "";
+            const label = record.hit ? "命中" : record.crash ? "碰板" : "未中";
+            return `<span class="attempt-chip ${cls}">第 ${index + 1} 发：${label} · ${record.nearest.toFixed(0)}px</span>`;
+          })
+          .join("");
+      }
+
+      function render() {
+        if (!state.layout) return;
+        const layout = state.layout;
+        ctx.clearRect(0, 0, layout.width, layout.height);
+        drawSky(layout);
+        drawPlates(layout);
+        drawField(layout);
+        drawInjectionPort(layout);
+        state.history.forEach((record, index) => {
+          const recordLayout = computeLayout(layout.width, layout.height, record.params.d);
+          const recordSim = simulate(record.params, recordLayout, record.target);
+          drawTrail(recordSim.points, record.hit, record.crash, 0.28, index);
+        });
+        if (state.currentShot) drawCurrentShot();
+        drawTarget(layout);
+        drawHudLabels(layout);
+        drawWave();
+        drawPopups();
+      }
+
+      function drawSky(layout) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, layout.height);
+        gradient.addColorStop(0, "#fffaf0");
+        gradient.addColorStop(1, "#f1faf9");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, layout.width, layout.height);
+        ctx.strokeStyle = "rgba(35, 93, 128, 0.08)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < layout.width; x += 34) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, layout.height);
+          ctx.stroke();
+        }
+        for (let y = 0; y < layout.height; y += 34) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(layout.width, y);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(19, 133, 111, 0.08)";
+        ctx.beginPath();
+        ctx.ellipse(layout.launchX - 24, layout.launchY + 76, 92, 24, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawPlates(layout) {
+        drawPlate(layout.fieldStart, layout.top - 8, layout.fieldEnd - layout.fieldStart, 14, "+", "#e8b64c");
+        drawPlate(layout.fieldStart, layout.bottom - 6, layout.fieldEnd - layout.fieldStart, 14, "-", "#8cc4ee");
+      }
+
+      function drawPlate(x, y, width, height, sign, color) {
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, "#fff9e8");
+        gradient.addColorStop(1, color);
+        ctx.fillStyle = gradient;
+        ctx.strokeStyle = "rgba(60, 73, 86, 0.48)";
+        ctx.lineWidth = 1.2;
+        roundRect(x, y, width, height, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = sign === "+" ? "#a13b1c" : "#1b5c91";
+        ctx.font = "800 15px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let px = x + 28; px < x + width - 14; px += 52) {
+          ctx.fillText(sign, px, y + height / 2);
+        }
+      }
+
+      function drawField(layout) {
+        ctx.fillStyle = "rgba(15, 154, 160, 0.1)";
+        ctx.strokeStyle = "rgba(15, 154, 160, 0.42)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([8, 8]);
+        roundRect(layout.fieldStart + 20, layout.top + 8, layout.fieldEnd - layout.fieldStart - 40, layout.bottom - layout.top - 16, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (let x = layout.fieldStart + 64; x < layout.fieldEnd - 42; x += 74) {
+          for (let y = layout.top + 56; y < layout.bottom - 42; y += 76) {
+            drawArrow(x, y - 26, x, y + 26, "#0f8f96", 2, 7);
+          }
+        }
+        ctx.fillStyle = "#087a80";
+        ctx.font = "800 13px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("E 向下", layout.fieldStart + 34, layout.top + 32);
+      }
+
+      function drawInjectionPort(layout) {
+        ctx.save();
+        ctx.strokeStyle = "#1d5e9f";
+        ctx.fillStyle = "rgba(35, 118, 189, 0.08)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(layout.launchX, layout.launchY, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = state.params.q >= 0 ? "#2376bd" : "#c74444";
+        ctx.beginPath();
+        ctx.arc(layout.launchX, layout.launchY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "900 12px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(state.params.q >= 0 ? "+" : "-", layout.launchX, layout.launchY);
+        drawArrow(layout.launchX + 16, layout.launchY, layout.fieldStart - 12, layout.launchY, "#2376bd", 3, 9);
+        ctx.fillStyle = "#1d5e9f";
+        ctx.font = "800 13px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("射入点", layout.launchX - 20, layout.launchY - 30);
+        ctx.restore();
+      }
+
+      function drawTarget(layout) {
+        const target = targetPoint(layout);
+        const locked = state.phase !== "setup";
+        ctx.save();
+        ctx.strokeStyle = locked ? "#a95f0c" : "#e28b21";
+        ctx.fillStyle = locked ? "rgba(226, 139, 33, 0.12)" : "rgba(226, 139, 33, 0.2)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, layout.targetRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, layout.targetRadius + 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(target.x - 30, target.y);
+        ctx.lineTo(target.x - 8, target.y);
+        ctx.moveTo(target.x + 8, target.y);
+        ctx.lineTo(target.x + 30, target.y);
+        ctx.moveTo(target.x, target.y - 30);
+        ctx.lineTo(target.x, target.y - 8);
+        ctx.moveTo(target.x, target.y + 8);
+        ctx.lineTo(target.x, target.y + 30);
+        ctx.stroke();
+        ctx.fillStyle = "#874d08";
+        ctx.font = "900 13px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(locked ? "靶标已锁" : "拖动靶标", target.x, target.y - 38);
+        ctx.restore();
+      }
+
+      function drawCurrentShot() {
+        const shot = state.currentShot;
+        const visiblePoints = shot.points.filter((point) => point.t <= state.shotTime);
+        drawTrail(visiblePoints, false, false, 1, 0);
+        const point = visiblePoints[visiblePoints.length - 1] || { x: state.layout.launchX, y: state.layout.launchY };
+        drawMotionVectors(point, shot);
+        const color = state.params.q >= 0 ? "#2376bd" : "#c74444";
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, state.layout.particleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#fff";
+        ctx.font = "900 13px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(state.params.q >= 0 ? "+" : "-", point.x, point.y);
+      }
+
+      function drawMotionVectors(point, shot) {
+        const speed = Math.hypot(point.vx || 0, point.vy || 0);
+        if (speed < 1) return;
+        const scale = 58 / speed;
+        const vEnd = { x: point.x + point.vx * scale, y: point.y + point.vy * scale };
+        const vxEnd = { x: point.x + Math.sign(point.vx || 1) * 54, y: point.y };
+        const vyLength = clamp(Math.abs(point.vy || 0) * scale, 0, 54);
+        const vyEnd = { x: point.x, y: point.y + Math.sign(point.vy || 1) * vyLength };
+        ctx.save();
+        ctx.globalAlpha = 0.86;
+        ctx.setLineDash([5, 5]);
+        drawArrow(point.x, point.y, vxEnd.x, vxEnd.y, "#2376bd", 2, 7);
+        ctx.fillStyle = "#2376bd";
+        ctx.font = "800 12px Microsoft YaHei, sans-serif";
+        ctx.fillText("vx", vxEnd.x + 8, vxEnd.y - 8);
+        if (Math.abs(point.vy || 0) > 8) {
+          drawArrow(point.x, point.y, vyEnd.x, vyEnd.y, "#0f9aa0", 2, 7);
+          ctx.fillStyle = "#087a80";
+          ctx.fillText("vy", vyEnd.x + 8, vyEnd.y);
+        }
+        ctx.setLineDash([]);
+        drawArrow(point.x, point.y, vEnd.x, vEnd.y, "#e28b21", 3, 9);
+        ctx.fillStyle = "#a95f0c";
+        ctx.fillText("v", vEnd.x + 8, vEnd.y - 8);
+        if (point.phase === "field" && Math.abs(shot.force) > 0.05) {
+          const forceDir = Math.sign(shot.force);
+          const fx = point.x - 34;
+          drawArrow(fx, point.y, fx, point.y + forceDir * 46, "#c74444", 3, 9);
+          ctx.fillStyle = "#9b282e";
+          ctx.fillText("F", fx + 8, point.y + forceDir * 46);
+        }
+        ctx.restore();
+      }
+
+      function drawTrail(points, hit, crash, alpha, index) {
+        if (!points || points.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = hit ? "#13856f" : crash ? "#c74444" : index % 2 ? "#2376bd" : "#e28b21";
+        ctx.lineWidth = alpha >= 1 ? 4 : 2.6;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        points.forEach((point, i) => {
+          if (i === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawHudLabels(layout) {
+        const sim = simulate(state.params);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+        ctx.strokeStyle = "rgba(216, 225, 221, 0.94)";
+        roundRect(layout.width - 182, 18, 158, 86, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#182338";
+        ctx.font = "900 13px Microsoft YaHei, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("当前参数", layout.width - 166, 42);
+        ctx.fillStyle = "#667085";
+        ctx.font = "700 12px Microsoft YaHei, sans-serif";
+        ctx.fillText(`U=${formatParam("U", state.params.U)}`, layout.width - 166, 64);
+        ctx.fillText(`d=${formatParam("d", state.params.d)}`, layout.width - 92, 64);
+        ctx.fillText(`F=${sim.force.toFixed(1)}`, layout.width - 166, 86);
+      }
+
+      function drawWave() {
+        if (!state.wave) return;
+        const progress = 1 - state.wave.life / 1.1;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, state.wave.life / 1.1);
+        ctx.strokeStyle = "#13856f";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(state.wave.x, state.wave.y, 22 + progress * 70, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        state.wave.life -= 0.02;
+        if (state.wave.life <= 0) state.wave = null;
+      }
+
+      function drawPopups() {
+        state.popups = state.popups.filter((popup) => popup.life > 0);
+        state.popups.forEach((popup) => {
+          const alpha = clamp(popup.life, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = popup.color;
+          ctx.font = "900 20px Microsoft YaHei, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(popup.text, popup.x, popup.y - (1.3 - popup.life) * 18);
+          ctx.restore();
+          popup.life -= 0.018;
+        });
+        if (state.popups.length || state.wave) requestAnimationFrame(render);
+      }
+
+      function drawArrow(x1, y1, x2, y2, color, width, head) {
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function roundRect(x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+
+      function canvasPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+
+      canvas.addEventListener("pointerdown", (event) => {
+        if (state.phase !== "setup") return;
+        const point = canvasPoint(event);
+        const target = targetPoint();
+        if (Math.hypot(point.x - target.x, point.y - target.y) <= 34) {
+          state.draggingTarget = true;
+          canvas.setPointerCapture(event.pointerId);
+        }
+      });
+
+      canvas.addEventListener("pointermove", (event) => {
+        if (!state.draggingTarget || state.phase !== "setup") return;
+        const point = canvasPoint(event);
+        const layout = state.layout;
+        state.target = targetFromPoint({
+          x: clamp(point.x, layout.fieldStart + 90, layout.fieldEnd - 48),
+          y: clamp(point.y, layout.top + 36, layout.bottom - 36),
+        }, layout);
+        render();
+      });
+
+      function endDrag(event) {
+        state.draggingTarget = false;
+        try {
+          canvas.releasePointerCapture(event.pointerId);
+        } catch {
+          // Capture can already be gone after touch cancellation.
+        }
+      }
+
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
+
+      ui.saveGroupBtn.addEventListener("click", updateUI);
+      ui.groupInput.addEventListener("input", updateUI);
+      ui.maxAttempts.addEventListener("input", () => {
+        state.maxAttempts = clamp(Number(ui.maxAttempts.value) || 3, 1, 10);
+        ui.maxAttempts.value = state.maxAttempts;
+        updateUI();
+      });
+      ui.randomTargetBtn.addEventListener("click", randomTarget);
+      ui.startBtn.addEventListener("click", startChallenge);
+      ui.fireBtn.addEventListener("click", fireShot);
+      ui.resetAttemptBtn.addEventListener("click", resetLevel);
+      ui.nextLevelBtn.addEventListener("click", nextLevel);
+      ui.newLevelBtn.addEventListener("click", () => {
+        state.levelNo += 1;
+        generateLevel(true);
+      });
+      window.addEventListener("resize", resizeCanvas);
+
+      state.levelNo = 1;
+      resizeCanvas();
+      generateLevel(true);
+    </script>
+  </body>
+</html>

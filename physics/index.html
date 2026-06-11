@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ AI赋能的电场复习课</title>
+<style>
+/* ========== Design System ========== */
+:root {
+  --bg: #0a0e17;
+  --surface: #111827;
+  --surface2: #1a2235;
+  --border: #1e2d45;
+  --text: #e2e8f0;
+  --muted: #7c8aa0;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59,130,246,0.3);
+  --green: #10b981;
+  --green-glow: rgba(16,185,129,0.3);
+  --orange: #f59e0b;
+  --orange-glow: rgba(245,158,11,0.3);
+  --red: #ef4444;
+  --phase-current: var(--accent);
+  --sidebar-w: 220px;
+  --topbar-h: 52px;
+  --bottombar-h: 40px;
+  --ai-panel-w: 0px;
+  --radius: 10px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Microsoft YaHei','PingFang SC',-apple-system,sans-serif;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* ========== Top Bar ========== */
+.topbar {
+  height: var(--topbar-h); background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px;
+  justify-content: space-between; flex-shrink: 0; z-index: 100;
+}
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px; font-weight: 700;
+  font-size: 16px; letter-spacing: 0.02em;
+}
+.topbar-brand .icon { font-size: 22px; }
+.topbar-brand .sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text); cursor: pointer;
+  font-size: 13px; font-family: inherit; transition: var(--transition);
+  display: flex; align-items: center; gap: 6px;
+}
+.btn:hover { border-color: var(--accent); background: rgba(59,130,246,0.1); }
+.btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-ghost { border-color: transparent; background: transparent; }
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 8px var(--green-glow); animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; } 50% { opacity:0.4; }
+}
+
+/* ========== Main Layout ========== */
+.main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+/* ========== Sidebar ========== */
+.sidebar {
+  width: var(--sidebar-w); background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  padding: 16px 0; z-index: 50;
+}
+.phase-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); padding: 0 20px; margin-bottom: 8px;
+}
+.phase-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; }
+.phase-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 14px; font-family: inherit;
+  transition: var(--transition); text-align: left; width: 100%;
+}
+.phase-btn:hover { background: var(--surface2); color: var(--text); }
+.phase-btn.current {
+  background: var(--surface2); color: #fff;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.phase-btn.current .phase-num {
+  background: var(--accent); color: #fff;
+}
+.phase-btn.completed .phase-num {
+  background: var(--green); color: #fff;
+}
+.phase-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  background: var(--surface2); border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.phase-info { display: flex; flex-direction: column; gap: 1px; }
+.phase-name { font-weight: 600; font-size: 13px; }
+.phase-desc { font-size: 11px; color: var(--muted); }
+
+/* Progress bar */
+.progress-section {
+  margin-top: auto; padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.progress-label {
+  font-size: 11px; color: var(--muted); margin-bottom: 6px;
+  display: flex; justify-content: space-between;
+}
+.progress-bar {
+  height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--accent); border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ========== Content Area ========== */
+.content {
+  flex: 1; position: relative; background: var(--bg);
+}
+.content iframe {
+  width: 100%; height: 100%; border: none;
+  display: block;
+}
+.phase-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  flex-direction: column; gap: 16px;
+  z-index: 10;
+}
+.phase-overlay.hidden { display: none; }
+.phase-overlay .big-icon { font-size: 64px; opacity: 0.3; }
+.phase-overlay h2 { font-size: 24px; color: var(--muted); }
+.phase-overlay p { color: var(--muted); font-size: 14px; max-width: 400px; text-align: center; }
+.phase-overlay .btn { margin-top: 8px; }
+
+/* Loading spinner */
+.spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========== AI Panel ========== */
+.ai-panel {
+  position: fixed; right: 0; top: var(--topbar-h); bottom: 0;
+  width: 380px; background: var(--surface);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%); transition: transform var(--transition);
+  z-index: 200; display: flex; flex-direction: column;
+}
+.ai-panel.open { transform: translateX(0); }
+.ai-panel-header {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: 14px;
+}
+.ai-panel-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 18px; padding: 4px 8px; border-radius: 6px;
+}
+.ai-panel-close:hover { color: var(--text); background: var(--surface2); }
+.ai-panel-body {
+  flex: 1; overflow: hidden; position: relative;
+}
+.ai-panel-body iframe {
+  width: 100%; height: 100%; border: none;
+}
+
+/* AI FAQ built-in mode */
+.ai-faq {
+  padding: 16px; overflow-y: auto; height: 100%;
+}
+.ai-faq input {
+  width: 100%; padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); font-family: inherit; font-size: 13px;
+  margin-bottom: 12px;
+}
+.ai-faq input::placeholder { color: var(--muted); }
+.ai-faq input:focus { outline: none; border-color: var(--accent); }
+.faq-item {
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  transition: var(--transition); font-size: 13px;
+  margin-bottom: 4px; color: var(--muted);
+}
+.faq-item:hover { background: var(--surface2); color: var(--text); }
+.faq-answer {
+  padding: 10px 12px; background: var(--surface2); border-radius: 8px;
+  margin-bottom: 8px; font-size: 13px; line-height: 1.6;
+  border-left: 3px solid var(--accent); display: none;
+}
+.faq-answer.show { display: block; }
+
+/* ========== Digital Human Corner ========== */
+.digital-human {
+  position: fixed; bottom: calc(var(--bottombar-h) + 16px); right: 16px;
+  width: 160px; height: 200px; z-index: 150;
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  transition: transform var(--transition), opacity var(--transition);
+  cursor: pointer; display: flex; flex-direction: column;
+}
+.digital-human.minimized {
+  transform: translateY(160px); opacity: 0.6;
+}
+.digital-human-header {
+  padding: 6px 10px; font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); flex-shrink: 0;
+}
+.digital-human-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.digital-human-body video {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.digital-human-body .placeholder {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; color: var(--muted); font-size: 11px;
+}
+.digital-human-body .placeholder .avatar-icon {
+  font-size: 48px; animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.digital-human-toggle {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,0.5); border: none; color: #fff;
+  border-radius: 50%; width: 20px; height: 20px;
+  font-size: 12px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+
+/* ========== Bottom Bar ========== */
+.bottombar {
+  height: var(--bottombar-h); background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px;
+  font-size: 12px; color: var(--muted); flex-shrink: 0;
+  justify-content: space-between;
+}
+.bottombar .hint-text { display: flex; align-items: center; gap: 6px; }
+.bottombar .timer { font-variant-numeric: tabular-nums; }
+
+/* ========== Responsive ========== */
+@media (max-width: 900px) {
+  .sidebar { width: 50px; }
+  .sidebar .phase-info, .sidebar .phase-title, .sidebar .progress-label { display: none; }
+  .phase-btn { justify-content: center; padding: 12px 8px; }
+  .ai-panel { width: 100%; }
+  .digital-human { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== Top Bar ========== -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="icon">⚡</span>
+    <span>AI赋能的电场复习课</span>
+    <span class="sub">必修三 · 静电场</span>
+  </div>
+  <div class="topbar-actions">
+    <span class="pulse-dot" title="AI助手在线"></span>
+    <button class="btn" id="aiToggle" title="AI知识库助手">
+      🤖 AI助手
+    </button>
+    <button class="btn btn-ghost" id="fullscreenBtn" title="全屏模式">
+      ⛶
+    </button>
+  </div>
+</header>
+
+<!-- ========== Main Layout ========== -->
+<div class="main">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="phase-title">📋 教学环节</div>
+    <div class="phase-nav">
+      <button class="phase-btn current" data-phase="0" onclick="switchPhase(0)">
+        <span class="phase-num">1</span>
+        <span class="phase-info">
+          <span class="phase-name">概念探索</span>
+          <span class="phase-desc">电场可视化</span>
+        </span>
+      </button>
+      <button class="phase-btn" data-phase="1" onclick="switchPhase(1)">
+        <span class="phase-num">2</span>
+        <span class="phase-info">
+          <span class="phase-name">原理深化</span>
+          <span class="phase-desc">示波管仿真</span>
+        </span>
+      </button>
+      <button class="phase-btn" data-phase="2" onclick="switchPhase(2)">
+        <span class="phase-num">3</span>
+        <span class="phase-info">
+          <span class="phase-name">闯关应用</span>
+          <span class="phase-desc">打靶挑战赛</span>
+        </span>
+      </button>
+    </div>
+    <!-- Progress -->
+    <div class="progress-section">
+      <div class="progress-label"><span>课堂进度</span><span id="progressText">0/3</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+  </nav>
+
+  <!-- Content Area -->
+  <main class="content" id="contentArea">
+    <!-- Phase 0: 电场可视化 -->
+    <div id="phase0" class="phase-overlay">
+      <div class="big-icon">🔍</div>
+      <h2>环节一：概念探索</h2>
+      <p>用电场可视化工具观察各种电荷配置下的电场线与等势线，建立电场分布的直观认知。</p>
+      <div class="spinner" id="loading0" style="display:none"></div>
+      <button class="btn" onclick="loadPhase(0)">🚀 开始探索</button>
+    </div>
+    <!-- Phase 1: 示波管仿真 -->
+    <div id="phase1" class="phase-overlay hidden">
+      <div class="big-icon">🔬</div>
+      <h2>环节二：原理深化</h2>
+      <p>用示波管3D仿真模型理解带电粒子在电场中加速和偏转的原理，探索仪器背后的物理逻辑。</p>
+      <div class="spinner" id="loading1" style="display:none"></div>
+      <button class="btn" onclick="loadPhase(1)">🚀 开始理解</button>
+    </div>
+    <!-- Phase 2: 打靶赛 -->
+    <div id="phase2" class="phase-overlay hidden">
+      <div class="big-icon">🎯</div>
+      <h2>环节三：闯关应用</h2>
+      <p>调参数、发粒子、命中靶标！以小组为单位挑战关卡，检验你是否真正掌握了电场知识。</p>
+      <div class="spinner" id="loading2" style="display:none"></div>
+      <button class="btn" onclick="loadPhase(2)">🚀 开始闯关</button>
+    </div>
+    <!-- iframe container -->
+    <iframe id="toolFrame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" loading="lazy"></iframe>
+  </main>
+</div>
+
+<!-- ========== AI Assistant Panel ========== -->
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-panel-header">
+    <span>🤖 AI物理知识助手</span>
+    <button class="ai-panel-close" onclick="toggleAI()">✕</button>
+  </div>
+  <div class="ai-panel-body">
+    <!-- FAQ Mode (built-in, always available) -->
+    <div class="ai-faq" id="aiFaq">
+      <input type="text" id="faqSearch" placeholder="💬 输入你的物理问题..." oninput="filterFAQ()">
+      <div id="faqList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Digital Human Corner ========== -->
+<div class="digital-human" id="digitalHuman">
+  <div class="digital-human-header">
+    <span class="pulse-dot" style="width:6px;height:6px"></span> AI讲解员
+  </div>
+  <div class="digital-human-body" onclick="toggleDigitalHuman()">
+    <div class="placeholder">
+      <div class="avatar-icon">👩‍🏫</div>
+      <span>点击唤醒讲解</span>
+    </div>
+    <button class="digital-human-toggle" onclick="event.stopPropagation(); toggleMinimize()" title="收起">_</button>
+  </div>
+</div>
+
+<!-- ========== Bottom Bar ========== -->
+<footer class="bottombar">
+  <span class="hint-text" id="bottomHint">💡 点击「🚀 开始探索」进入第一环节</span>
+  <span class="timer" id="classTimer">⏱ 00:00</span>
+</footer>
+
+<script>
+// ========== Phase Management ==========
+const tools = {
+  0: { file: 'efield.html',  name: '电场可视化教学工具', hint: '💡 试试调整电荷位置和大小，观察电场线如何变化' },
+  1: { file: 'oscilloscope.html', name: '示波管原理仿真', hint: '💡 调节偏转电压，观察电子束的轨迹变化' },
+  2: { file: 'target-game.html', name: '带电粒子打靶赛', hint: '💡 每关只能调一个参数！命中靶标才能过关' },
+};
+let currentPhase = -1;
+let completedPhases = new Set();
+
+function switchPhase(idx) {
+  if (currentPhase === idx) return;
+  currentPhase = idx;
+
+  // Update nav
+  document.querySelectorAll('.phase-btn').forEach((b,i) => {
+    b.classList.toggle('current', i === idx);
+    b.classList.toggle('completed', completedPhases.has(i));
+  });
+
+  // Hide all overlays, show current
+  for (let i = 0; i < 3; i++) {
+    const overlay = document.getElementById('phase'+i);
+    overlay.classList.add('hidden');
+  }
+  document.getElementById('phase'+idx).classList.remove('hidden');
+
+  // Hide iframe
+  const frame = document.getElementById('toolFrame');
+  frame.style.display = 'none';
+  frame.src = '';
+
+  // Update hint
+  document.getElementById('bottomHint').textContent = tools[idx].hint;
+
+  // Update progress
+  completedPhases.add(idx);
+  updateProgress();
+}
+
+function loadPhase(idx) {
+  const loading = document.getElementById('loading'+idx);
+  loading.style.display = 'block';
+
+  const frame = document.getElementById('toolFrame');
+  frame.style.display = 'block';
+  frame.src = tools[idx].file;
+
+  // Hide overlay
+  document.getElementById('phase'+idx).classList.add('hidden');
+
+  // Update nav
+  document.querySelectorAll('.phase-btn').forEach((b,i) => {
+    b.classList.toggle('current', i === idx);
+    b.classList.toggle('completed', completedPhases.has(i));
+  });
+
+  completedPhases.add(idx);
+  updateProgress();
+  document.getElementById('bottomHint').textContent = tools[idx].hint;
+
+  frame.onload = () => {
+    loading.style.display = 'none';
+  };
+}
+
+function updateProgress() {
+  const count = completedPhases.size;
+  const pct = Math.round(count / 3 * 100);
+  document.getElementById('progressText').textContent = count + '/3';
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  // Mark all up to current as completed
+  for (let i = 0; i <= currentPhase; i++) completedPhases.add(i);
+  document.querySelectorAll('.phase-btn').forEach((b,i) => {
+    b.classList.toggle('completed', i <= currentPhase || completedPhases.has(i));
+  });
+}
+
+// ========== AI Panel ==========
+function toggleAI() {
+  document.getElementById('aiPanel').classList.toggle('open');
+  document.getElementById('aiToggle').classList.toggle('active');
+}
+
+document.getElementById('aiToggle').addEventListener('click', toggleAI);
+
+// ========== Digital Human ==========
+function toggleDigitalHuman() {
+  const dh = document.getElementById('digitalHuman');
+  // In production, this would play a pre-recorded teacher explanation video
+  const body = dh.querySelector('.digital-human-body');
+  const text = currentPhase >= 0
+    ? '同学们好！现在进入第'+(currentPhase+1)+'个环节：' + tools[currentPhase].name
+    : '欢迎来到AI赋能的电场复习课！';
+  
+  // Speak using Web Speech API
+  if ('speechSynthesis' in window) {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'zh-CN';
+    utter.rate = 0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }
+}
+
+function toggleMinimize() {
+  document.getElementById('digitalHuman').classList.toggle('minimized');
+}
+
+// ========== Fullscreen ==========
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen();
+  }
+});
+
+// ========== FAQ Database ==========
+const faqDB = [
+  { q:'什么是电场强度？', a:'电场强度 E = F/q，是描述电场力性质的物理量。单位是 N/C 或 V/m。电场强度是矢量，正电荷受力方向与电场方向相同，负电荷相反。' },
+  { q:'电场线有什么特点？', a:'电场线从正电荷出发（或从无穷远来），终止于负电荷（或延伸到无穷远）。电场线越密，电场越强。电场线永不相交，切线方向即电场方向。' },
+  { q:'匀强电场的特点是什么？', a:'匀强电场中各点场强大小相等、方向相同。电场线为等间距的平行直线。平行板电容器两极板间的电场可近似看作匀强电场，E=U/d。' },
+  { q:'带电粒子在电场中如何运动？', a:'带电粒子在电场中受到电场力 F=qE。在匀强电场中做类平抛运动：沿初速度方向匀速直线，沿电场力方向匀加速。加速度 a=qE/m。' },
+  { q:'示波管的原理是什么？', a:'示波管由电子枪（发射加速电子）、偏转电极（X/Y方向偏转）和荧光屏三部分组成。电子束经过偏转电场后打到荧光屏上发光，偏转量与偏转电压成正比。' },
+  { q:'如何调节示波管让光点移动？', a:'调节Y偏转电压改变竖直偏转量，调节X偏转电压改变水平偏转量。偏转量 y = (qUl²)/(2mdv₀²)，与偏转电压U成正比。' },
+  { q:'等势线是什么？', a:'等势线是电场中电势相等的点连成的曲线。等势线与电场线处处垂直。沿等势线移动电荷不做功。等势线越密，电场越强。' },
+  { q:'电场力做功与电势差的关系？', a:'W = qU，即电场力做功等于电荷量乘以电势差。正电荷从高电势移到低电势，电场力做正功，电势能减小。' }
+];
+
+function renderFAQ() {
+  const list = document.getElementById('faqList');
+  list.innerHTML = faqDB.map((item, i) => `
+    <div class="faq-item" onclick="toggleFaq(${i})">💬 ${item.q}</div>
+    <div class="faq-answer" id="faqAns${i}">${item.a}</div>
+  `).join('');
+}
+
+function toggleFaq(i) {
+  const ans = document.getElementById('faqAns'+i);
+  ans.classList.toggle('show');
+}
+
+function filterFAQ() {
+  const q = document.getElementById('faqSearch').value.toLowerCase();
+  const items = document.querySelectorAll('.faq-item');
+  faqDB.forEach((item, i) => {
+    const match = !q || item.q.includes(q) || item.a.includes(q);
+    items[i].style.display = match ? '' : 'none';
+  });
+}
+
+// ========== Timer ==========
+let timerSeconds = 0;
+let timerInterval = null;
+
+function startTimer() {
+  if (timerInterval) return;
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    const m = Math.floor(timerSeconds / 60).toString().padStart(2,'0');
+    const s = (timerSeconds % 60).toString().padStart(2,'0');
+    document.getElementById('classTimer').textContent = '⏱ ' + m + ':' + s;
+  }, 1000);
+}
+
+// Start timer on first load
+startTimer();
+
+// ========== Init ==========
+renderFAQ();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') switchPhase(0);
+  if (e.key === '2') switchPhase(1);
+  if (e.key === '3') switchPhase(2);
+  if (e.key === 'Escape') {
+    document.getElementById('aiPanel').classList.remove('open');
+    document.getElementById('aiToggle').classList.remove('active');
+  }
+  if (e.key === 'Enter' && currentPhase >= 0 && document.getElementById('phase'+currentPhase).classList.contains('hidden') === false) {
+    loadPhase(currentPhase);
+  }
+});
+</script>
+</body>
+</html>
