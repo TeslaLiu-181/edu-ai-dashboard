@@ -209,49 +209,55 @@ body {
 }
 .faq-answer.show { display: block; }
 
-/* ========== Digital Human Corner ========== */
-.digital-human {
-  position: fixed; bottom: calc(var(--bottombar-h) + 16px); left: 16px;
-  width: 160px; height: 200px; z-index: 150;
-  border-radius: var(--radius); overflow: hidden;
+/* ========== Digital Human Overlay ========== */
+.dh-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.dh-overlay.show { opacity: 1; pointer-events: auto; }
+.dh-container {
+  position: relative; width: min(85vw, 960px);
+  border-radius: 16px; overflow: hidden;
+  background: #000; box-shadow: 0 0 80px rgba(59,130,246,0.2), 0 20px 60px rgba(0,0,0,0.8);
+  transform: scale(0.9); transition: transform 0.4s ease;
+}
+.dh-overlay.show .dh-container { transform: scale(1); }
+.dh-titlebar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+  padding: 12px 16px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; font-weight: 600;
+}
+.dh-video { display: block; width: 100%; aspect-ratio: 16/9; background: #000; }
+.dh-close {
+  background: rgba(255,255,255,0.15); border: none; color: #fff;
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.dh-close:hover { background: rgba(255,255,255,0.3); }
+.dh-phase-label {
+  color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 400; margin-left: 8px;
+}
+/* Corner teaser */
+.dh-teaser {
+  position: fixed; bottom: calc(var(--bottombar-h) + 12px); left: 12px;
+  z-index: 250; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  transition: transform var(--transition), opacity var(--transition);
-  cursor: pointer; display: flex; flex-direction: column;
+  border-radius: 10px; padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
 }
-.digital-human.minimized {
-  transform: translateY(160px); opacity: 0.6;
-}
-.digital-human-header {
-  padding: 6px 10px; font-size: 11px; font-weight: 600;
-  display: flex; align-items: center; gap: 6px;
-  background: var(--surface2); flex-shrink: 0;
-}
-.digital-human-body {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  position: relative; overflow: hidden;
-}
-.digital-human-body video {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.digital-human-body .placeholder {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 4px; color: var(--muted); font-size: 11px;
-}
-.digital-human-body .placeholder .avatar-icon {
-  font-size: 48px; animation: float 3s ease-in-out infinite;
-}
-@keyframes float {
-  0%,100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.digital-human-toggle {
-  position: absolute; top: 4px; right: 4px;
-  background: rgba(0,0,0,0.5); border: none; color: #fff;
-  border-radius: 50%; width: 20px; height: 20px;
-  font-size: 12px; cursor: pointer; display: flex;
-  align-items: center; justify-content: center;
-}
+.dh-teaser.visible { opacity: 1; pointer-events: auto; }
+.dh-teaser-icon { font-size: 20px; }
+.dh-teaser-info { display: flex; flex-direction: column; gap: 1px; }
+.dh-teaser-name { font-weight: 600; }
+.dh-teaser-hint { color: var(--muted); font-size: 10px; }
 
 /* ========== Bottom Bar ========== */
 .bottombar {
@@ -270,7 +276,7 @@ body {
   .sidebar .phase-info, .sidebar .phase-title, .sidebar .progress-label { display: none; }
   .phase-btn { justify-content: center; padding: 12px 8px; }
   .ai-panel { width: 100%; }
-  .digital-human { display: none; }
+  .dh-container { width: 95vw; }
 }
 </style>
 </head>
@@ -381,21 +387,24 @@ body {
   </div>
 </div>
 
-<!-- ========== Digital Human Corner ========== -->
-<div class="digital-human" id="digitalHuman">
-  <div class="digital-human-header">
-    <span class="pulse-dot" style="width:6px;height:6px"></span> 迈克尔·法拉第
-  </div>
-  <div class="digital-human-body" onclick="playDigitalHuman()">
-    <video id="dhVideo" muted playsinline loop style="width:100%;height:100%;object-fit:cover;display:none;">
-      <source src="assets/dh-phase1.mp4" type="video/mp4">
-    </video>
-    <div class="placeholder" id="dhPlaceholder">
-      <div class="avatar-icon">👨‍🔬</div>
-      <span>点击唤醒法拉第</span>
+<!-- ========== Digital Human Overlay ========== -->
+<div class="dh-overlay" id="dhOverlay">
+  <div class="dh-container">
+    <div class="dh-titlebar">
+      <span>👨‍🔬 迈克尔·法拉第 <span class="dh-phase-label" id="dhPhaseLabel"></span></span>
+      <button class="dh-close" onclick="closeDH()">✕</button>
     </div>
-    <button class="digital-human-toggle" onclick="event.stopPropagation(); toggleMinimize()" title="收起">_</button>
+    <video id="dhVideo" class="dh-video" playsinline preload="auto"></video>
   </div>
+</div>
+
+<!-- Digital Human Teaser -->
+<div class="dh-teaser" id="dhTeaser" onclick="replayDH()">
+  <span class="dh-teaser-icon">👨‍🔬</span>
+  <span class="dh-teaser-info">
+    <span class="dh-teaser-name">法拉第讲解</span>
+    <span class="dh-teaser-hint">点击回放</span>
+  </span>
 </div>
 
 <!-- ========== Bottom Bar ========== -->
@@ -438,6 +447,9 @@ function switchPhase(idx) {
 
   // Update hint
   document.getElementById('bottomHint').textContent = tools[idx].hint;
+
+  // Auto-trigger Faraday digital human
+  showDH(idx);
 
   // Update progress
   completedPhases.add(idx);
@@ -491,30 +503,52 @@ function toggleAI() {
 
 document.getElementById('aiToggle').addEventListener('click', toggleAI);
 
-// ========== Digital Human - Faraday ==========
-function playDigitalHuman() {
-  const dh = document.getElementById('digitalHuman');
-  dh.classList.remove('minimized');
+// ========== Digital Human - Faraday Overlay ==========
+const dhPhaseLabels = ['环节一：概念探索 — 电场可视化', '环节二：原理深化 — 示波管仿真', '环节三：闯关应用 — 打靶挑战赛', '课堂总结'];
+
+function showDH(phaseIdx) {
   const video = document.getElementById('dhVideo');
-  const placeholder = document.getElementById('dhPlaceholder');
-  const phaseIdx = currentPhase >= 0 ? currentPhase : 0;
-  video.querySelector('source').src = 'assets/dh-phase' + (phaseIdx + 1) + '.mp4';
-  video.load();
-  video.style.display = 'block';
-  placeholder.style.display = 'none';
-  video.play().catch(() => {});
+  const overlay = document.getElementById('dhOverlay');
+  const label = document.getElementById('dhPhaseLabel');
+  const idx = phaseIdx >= 0 ? phaseIdx : 0;
+  video.src = 'assets/dh-phase' + (idx + 1) + '.mp4';
+  label.textContent = dhPhaseLabels[idx];
+  overlay.classList.add('show');
+  video.muted = false;
+  video.currentTime = 0;
+  video.play().then(() => {
+    console.log('🎬 Faraday video playing: phase ' + (idx + 1));
+  }).catch(e => {
+    console.warn('Autoplay blocked, user interaction needed:', e.message);
+    document.getElementById('bottomHint').textContent = '🔊 点击页面任意位置激活音频';
+  });
+  
+  // Auto-close when video ends
+  video.onended = () => {
+    closeDH();
+  };
 }
 
-function stopDigitalHuman() {
+function closeDH() {
   const video = document.getElementById('dhVideo');
+  const overlay = document.getElementById('dhOverlay');
   video.pause();
-  video.style.display = 'none';
-  document.getElementById('dhPlaceholder').style.display = 'flex';
+  overlay.classList.remove('show');
+  // Show teaser
+  document.getElementById('dhTeaser').classList.add('visible');
 }
 
-function toggleMinimize() {
-  document.getElementById('digitalHuman').classList.toggle('minimized');
+function replayDH() {
+  showDH(currentPhase >= 0 ? currentPhase : 0);
+  document.getElementById('dhTeaser').classList.remove('visible');
 }
+
+// Close with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeDH();
+  }
+});
 
 // ========== Fullscreen ==========
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
