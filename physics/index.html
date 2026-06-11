@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>⚡ AI赋能的电场复习课</title>
+<script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/1.2.0-beta.19/libs/cn/index.js"></script>
 <style>
 /* ========== Design System ========== */
 :root {
@@ -210,7 +211,7 @@ body {
 
 /* ========== Digital Human Corner ========== */
 .digital-human {
-  position: fixed; bottom: calc(var(--bottombar-h) + 16px); right: 16px;
+  position: fixed; bottom: calc(var(--bottombar-h) + 16px); left: 16px;
   width: 160px; height: 200px; z-index: 150;
   border-radius: var(--radius); overflow: hidden;
   background: var(--surface); border: 1px solid var(--border);
@@ -362,14 +363,20 @@ body {
 <!-- ========== AI Assistant Panel ========== -->
 <div class="ai-panel" id="aiPanel">
   <div class="ai-panel-header">
-    <span>🤖 AI物理知识助手</span>
+    <span>🤖 AI 物理知识助手</span>
     <button class="ai-panel-close" onclick="toggleAI()">✕</button>
   </div>
   <div class="ai-panel-body">
-    <!-- FAQ Mode (built-in, always available) -->
-    <div class="ai-faq" id="aiFaq">
-      <input type="text" id="faqSearch" placeholder="💬 输入你的物理问题..." oninput="filterFAQ()">
-      <div id="faqList"></div>
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:16px;padding:32px;text-align:center;">
+      <div style="font-size:48px;">🤖</div>
+      <h3 style="color:var(--text);margin:0;">AI 助手已就绪</h3>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;">
+        点击右下角 <span style="color:var(--accent);font-weight:600;">Coze</span> 浮动按钮<br>
+        即可向电场复习课 AI 助教提问
+      </p>
+      <p style="color:var(--muted);font-size:11px;margin-top:8px;">
+        💡 试试问：电场强度公式？示波管原理？<br>带电粒子如何偏转？
+      </p>
     </div>
   </div>
 </div>
@@ -513,38 +520,26 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
   }
 });
 
-// ========== FAQ Database ==========
-const faqDB = [
-  { q:'什么是电场强度？', a:'电场强度 E = F/q，是描述电场力性质的物理量。单位是 N/C 或 V/m。电场强度是矢量，正电荷受力方向与电场方向相同，负电荷相反。' },
-  { q:'电场线有什么特点？', a:'电场线从正电荷出发（或从无穷远来），终止于负电荷（或延伸到无穷远）。电场线越密，电场越强。电场线永不相交，切线方向即电场方向。' },
-  { q:'匀强电场的特点是什么？', a:'匀强电场中各点场强大小相等、方向相同。电场线为等间距的平行直线。平行板电容器两极板间的电场可近似看作匀强电场，E=U/d。' },
-  { q:'带电粒子在电场中如何运动？', a:'带电粒子在电场中受到电场力 F=qE。在匀强电场中做类平抛运动：沿初速度方向匀速直线，沿电场力方向匀加速。加速度 a=qE/m。' },
-  { q:'示波管的原理是什么？', a:'示波管由电子枪（发射加速电子）、偏转电极（X/Y方向偏转）和荧光屏三部分组成。电子束经过偏转电场后打到荧光屏上发光，偏转量与偏转电压成正比。' },
-  { q:'如何调节示波管让光点移动？', a:'调节Y偏转电压改变竖直偏转量，调节X偏转电压改变水平偏转量。偏转量 y = (qUl²)/(2mdv₀²)，与偏转电压U成正比。' },
-  { q:'等势线是什么？', a:'等势线是电场中电势相等的点连成的曲线。等势线与电场线处处垂直。沿等势线移动电荷不做功。等势线越密，电场越强。' },
-  { q:'电场力做功与电势差的关系？', a:'W = qU，即电场力做功等于电荷量乘以电势差。正电荷从高电势移到低电势，电场力做正功，电势能减小。' }
-];
-
-function renderFAQ() {
-  const list = document.getElementById('faqList');
-  list.innerHTML = faqDB.map((item, i) => `
-    <div class="faq-item" onclick="toggleFaq(${i})">💬 ${item.q}</div>
-    <div class="faq-answer" id="faqAns${i}">${item.a}</div>
-  `).join('');
-}
-
-function toggleFaq(i) {
-  const ans = document.getElementById('faqAns'+i);
-  ans.classList.toggle('show');
-}
-
-function filterFAQ() {
-  const q = document.getElementById('faqSearch').value.toLowerCase();
-  const items = document.querySelectorAll('.faq-item');
-  faqDB.forEach((item, i) => {
-    const match = !q || item.q.includes(q) || item.a.includes(q);
-    items[i].style.display = match ? '' : 'none';
+// ========== COZE AI Chat SDK ==========
+try {
+  new CozeWebSDK.WebChatClient({
+    config: {
+      bot_id: '7650078981979111460',
+    },
+    componentProps: {
+      title: '电场复习课 AI 助教',
+    },
+    auth: {
+      type: 'token',
+      token: 'pat_NldDluJy86ddcszTOg2gVe1LiEvPlRbnnYbETDfCUdReN0jt7AE96f2l1rCpfJCB',
+      onRefreshToken: function () {
+        return 'pat_NldDluJy86ddcszTOg2gVe1LiEvPlRbnnYbETDfCUdReN0jt7AE96f2l1rCpfJCB'
+      }
+    }
   });
+  console.log('✅ COZE AI 助教已加载');
+} catch(e) {
+  console.warn('COZE 加载失败，使用离线 FAQ 备用:', e);
 }
 
 // ========== Timer ==========
@@ -565,7 +560,7 @@ function startTimer() {
 startTimer();
 
 // ========== Init ==========
-renderFAQ();
+// COZE AI 助教已通过浮动按钮接入，点击右下角即可使用
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
