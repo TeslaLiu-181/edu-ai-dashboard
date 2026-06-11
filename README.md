@@ -42,12 +42,17 @@ open index.html
 
 ```
 edu-ai-dashboard/
-├── index.html           # 入口页面
-├── dashboard.html       # 云上3班教师看板
-├── score-tracker.html   # 成绩追踪可视化
+├── index.html              # 入口页面
+├── dashboard.html          # 云上3班教师看板
+├── score-tracker.html      # 成绩追踪可视化
+├── physics/                # 物理学科教学工具
+│   ├── index.html          # ⚡ AI赋能的电场复习课（统一教学入口）
+│   ├── efield.html         # 电场可视化教学工具
+│   ├── oscilloscope.html   # 示波管原理仿真
+│   └── target-game.html    # 带电粒子打靶赛
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml   # GitHub Pages 自动部署
+│       └── deploy.yml      # GitHub Pages 自动部署
 └── README.md
 ```
 
