@@ -384,12 +384,15 @@ body {
 <!-- ========== Digital Human Corner ========== -->
 <div class="digital-human" id="digitalHuman">
   <div class="digital-human-header">
-    <span class="pulse-dot" style="width:6px;height:6px"></span> AI讲解员
+    <span class="pulse-dot" style="width:6px;height:6px"></span> 迈克尔·法拉第
   </div>
-  <div class="digital-human-body" onclick="toggleDigitalHuman()">
-    <div class="placeholder">
-      <div class="avatar-icon">👩‍🏫</div>
-      <span>点击唤醒讲解</span>
+  <div class="digital-human-body" onclick="playDigitalHuman()">
+    <video id="dhVideo" muted playsinline loop style="width:100%;height:100%;object-fit:cover;display:none;">
+      <source src="assets/dh-phase1.mp4" type="video/mp4">
+    </video>
+    <div class="placeholder" id="dhPlaceholder">
+      <div class="avatar-icon">👨‍🔬</div>
+      <span>点击唤醒法拉第</span>
     </div>
     <button class="digital-human-toggle" onclick="event.stopPropagation(); toggleMinimize()" title="收起">_</button>
   </div>
@@ -488,23 +491,25 @@ function toggleAI() {
 
 document.getElementById('aiToggle').addEventListener('click', toggleAI);
 
-// ========== Digital Human ==========
-function toggleDigitalHuman() {
+// ========== Digital Human - Faraday ==========
+function playDigitalHuman() {
   const dh = document.getElementById('digitalHuman');
-  // In production, this would play a pre-recorded teacher explanation video
-  const body = dh.querySelector('.digital-human-body');
-  const text = currentPhase >= 0
-    ? '同学们好！现在进入第'+(currentPhase+1)+'个环节：' + tools[currentPhase].name
-    : '欢迎来到AI赋能的电场复习课！';
-  
-  // Speak using Web Speech API
-  if ('speechSynthesis' in window) {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'zh-CN';
-    utter.rate = 0.9;
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utter);
-  }
+  dh.classList.remove('minimized');
+  const video = document.getElementById('dhVideo');
+  const placeholder = document.getElementById('dhPlaceholder');
+  const phaseIdx = currentPhase >= 0 ? currentPhase : 0;
+  video.querySelector('source').src = 'assets/dh-phase' + (phaseIdx + 1) + '.mp4';
+  video.load();
+  video.style.display = 'block';
+  placeholder.style.display = 'none';
+  video.play().catch(() => {});
+}
+
+function stopDigitalHuman() {
+  const video = document.getElementById('dhVideo');
+  video.pause();
+  video.style.display = 'none';
+  document.getElementById('dhPlaceholder').style.display = 'flex';
 }
 
 function toggleMinimize() {
